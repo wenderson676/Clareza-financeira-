@@ -1,0 +1,6 @@
+{
+  "name": "Clareza",
+  "description": "Aplicativo financeiro offline e manual baseado no princípio de mordomia e regra 50/30/20.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
