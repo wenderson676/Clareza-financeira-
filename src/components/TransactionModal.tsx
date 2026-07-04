@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { X } from 'lucide-react';
 import { Transaction, TransactionType, Bucket } from '../types';
-import { formatCurrency, CATEGORIES, BUCKETS, suggestCategory } from '../lib/utils';
+import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface TransactionModalProps {
@@ -211,18 +211,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
                   required
                   value={description}
                   onChange={e => {
-                    const newDesc = e.target.value;
-                    setDescription(newDesc);
-                    if (!editingTransaction) {
-                      const suggestion = suggestCategory(newDesc);
-                      if (suggestion) {
-                        setFormTab(suggestion.formTab);
-                        if (suggestion.bucket !== 'Renda' && suggestion.bucket !== 'Transferência') {
-                          setBucket(suggestion.bucket as Bucket);
-                        }
-                        setCategory(suggestion.category);
-                      }
-                    }
+                    setDescription(e.target.value);
                   }}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                   placeholder="Ex: Mercado, Salário, etc."
@@ -264,18 +253,19 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
               {formTab !== 'transfer' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                  <select
+                  <input
                     required
+                    list="categories-list"
                     value={category}
                     onChange={e => setCategory(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                  >
-                    <option value="" disabled>Selecione...</option>
+                    placeholder="Selecione ou digite uma nova categoria..."
+                  />
+                  <datalist id="categories-list">
                     {(formTab === 'income' ? CATEGORIES['Renda'] : CATEGORIES[bucket]).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat} value={cat} />
                     ))}
-                    <option value="Outro">Outro...</option>
-                  </select>
+                  </datalist>
                 </div>
               )}
 

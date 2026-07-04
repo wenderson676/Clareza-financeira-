@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2 } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
-import { Devotional } from './components/Devotional';
+import { Comparison } from './components/Comparison';
 import { Planning } from './components/Planning';
 import { TransactionModal } from './components/TransactionModal';
 import { useStore } from './lib/store';
@@ -11,7 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { Transaction } from './types';
 
-type Tab = 'dashboard' | 'transactions' | 'planning' | 'devotional';
+type Tab = 'dashboard' | 'transactions' | 'planning' | 'comparison';
 
 export default function App() {
   const { 
@@ -182,7 +182,7 @@ export default function App() {
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 pt-12">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Clareza</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Clareza Financeira</h2>
                     <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                       <X size={24} />
                     </button>
@@ -246,7 +246,7 @@ export default function App() {
                 </div>
                 
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 text-center">
-                  <p className="text-xs text-slate-400 dark:text-slate-500">Clareza v1.0</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Clareza Financeira v1.0</p>
                 </div>
               </motion.div>
             </>
@@ -313,7 +313,7 @@ export default function App() {
                 <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Home size={32} />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Bem-vindo(a) à Clareza</h2>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Bem-vindo(a) à Clareza Financeira</h2>
                 <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
                   Como você gostaria de ser chamado(a)?
                 </p>
@@ -349,7 +349,16 @@ export default function App() {
         {/* Content Area */}
         <main className="flex-1 px-4 py-4 overflow-y-auto">
           {currentTab === 'dashboard' && (
-            <Dashboard data={monthData} previousBalance={getAccumulatedBalance(monthId)} allData={state.monthlyData} goals={state.goals} addGoal={addGoal} updateGoal={updateGoal} deleteGoal={deleteGoal} />
+            <Dashboard 
+              data={monthData} 
+              previousBalance={getAccumulatedBalance(monthId)} 
+              allData={state.monthlyData} 
+              goals={state.goals} 
+              addGoal={addGoal} 
+              updateGoal={updateGoal} 
+              deleteGoal={deleteGoal}
+              onSaveNote={(note) => setDevotionalNote(monthId, note)}
+            />
           )}
           {currentTab === 'transactions' && (
             <Transactions 
@@ -362,8 +371,8 @@ export default function App() {
           {currentTab === 'planning' && (
             <Planning data={monthData} previousBalance={getAccumulatedBalance(monthId)} />
           )}
-          {currentTab === 'devotional' && (
-            <Devotional data={monthData} onSaveNote={(note) => setDevotionalNote(monthId, note)} />
+          {currentTab === 'comparison' && (
+            <Comparison allData={state.monthlyData} />
           )}
         </main>
 
@@ -406,10 +415,10 @@ export default function App() {
             onClick={() => setCurrentTab('planning')} 
           />
           <NavItem 
-            icon={<Lightbulb size={24} />} 
-            label="Reflexão" 
-            isActive={currentTab === 'devotional'} 
-            onClick={() => setCurrentTab('devotional')} 
+            icon={<BarChart2 size={24} />}
+            label="Análise"
+            isActive={currentTab === 'comparison'}
+            onClick={() => setCurrentTab('comparison')}
           />
         </nav>
       </div>

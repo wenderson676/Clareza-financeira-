@@ -70,7 +70,7 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
 
       <div className="space-y-6">
         {groupedTransactions.length === 0 ? (
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center text-slate-500 dark:text-slate-400 shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800">
+          <div className="glass-card p-12 text-center text-slate-500 dark:text-slate-400">
             Nenhum lançamento neste mês ainda.
           </div>
         ) : (
@@ -83,7 +83,7 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
                 </h3>
               </div>
               
-              <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
+              <div className="glass-card overflow-hidden">
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {group.transactions.map(t => {
                     const isTransfer = t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira');

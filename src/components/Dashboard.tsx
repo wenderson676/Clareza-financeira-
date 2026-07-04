@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2 } from 'lucide-react';
+import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb } from 'lucide-react';
 import { formatCurrency, BUCKETS, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData, Goal } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,18 +15,26 @@ interface DashboardProps {
   addGoal?: (goal: Omit<Goal, 'id'>) => void;
   updateGoal?: (id: string, goal: Partial<Goal>) => void;
   deleteGoal?: (id: string) => void;
+  onSaveNote?: (note: string) => void;
 }
 
-export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal }: DashboardProps) {
+export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal, onSaveNote }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [goalForm, setGoalForm] = useState({ title: '', targetAmount: '', currentAmount: '' });
+  
+  const [note, setNote] = useState(data.devotionalNote || '');
+  const [isEditingNote, setIsEditingNote] = useState(false);
 
   useEffect(() => {
     setQuote(getRandomVerse());
   }, []);
+
+  useEffect(() => {
+    setNote(data.devotionalNote || '');
+  }, [data.devotionalNote]);
 
   const totalIncome = data.transactions
     .filter(t => t.type === 'income' && !t.isPending)
@@ -131,7 +139,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
         </div>
       </header>
 
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+      <div className="glass-card p-6">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
@@ -152,7 +160,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
       </div>
 
       {pendingBills.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+        <div className="glass-card p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <Calendar size={18} className="text-rose-500" />
@@ -180,7 +188,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+      <div className="glass-card p-6">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Distribuição de Gastos</h2>
         
         {(() => {
@@ -264,7 +272,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           
           console.log(BUCKETS);
   return (
-            <div key={name} className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors relative">
+            <div key={name} className="glass-card p-6 relative">
               <button 
                 onClick={() => setActiveInfo(name)}
                 className="absolute top-4 right-4 text-slate-300 hover:text-emerald-500 dark:text-slate-600 dark:hover:text-emerald-400 transition-colors"
@@ -303,7 +311,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
         })}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+      <div className="glass-card p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Target size={18} className="text-indigo-500" />
@@ -391,7 +399,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+      <div className="glass-card p-6">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Evolução (Últimos 6 meses)</h2>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -410,6 +418,71 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* Reflexão Financeira Card */}
+      <div className="glass-card p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Lightbulb size={22} className="animate-pulse" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Reflexão do Mês</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Avaliação do seu progresso financeiro</p>
+          </div>
+        </div>
+
+        <div className="bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl p-4 mb-4 border border-emerald-100/30 dark:border-emerald-500/10">
+          <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed italic">
+            "Como você avalia suas escolhas financeiras este mês? Onde você poderia ter administrado melhor os seus recursos?"
+          </p>
+        </div>
+
+        {isEditingNote ? (
+          <div className="space-y-3">
+            <textarea
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 dark:focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500 rounded-2xl p-3 text-sm text-slate-700 dark:text-slate-200 outline-none h-28 transition-all resize-none"
+              placeholder="Escreva aqui as lições aprendidas, conquistas ou pontos de melhoria neste mês..."
+              value={note}
+              onChange={e => setNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setNote(data.devotionalNote || '');
+                  setIsEditingNote(false);
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (onSaveNote) {
+                    onSaveNote(note);
+                  }
+                  setIsEditingNote(false);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl p-4 min-h-[70px] cursor-pointer border border-transparent hover:border-emerald-100 dark:hover:border-emerald-500/10 transition-all flex flex-col justify-center"
+            onClick={() => setIsEditingNote(true)}
+          >
+            {note ? (
+              <p className="text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{note}</p>
+            ) : (
+              <div className="text-center py-2">
+                <span className="text-xs text-slate-400 dark:text-slate-500 italic block">Nenhuma reflexão salva ainda. Clique aqui para escrever suas anotações...</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-950 text-slate-100 p-8 rounded-3xl relative overflow-hidden shadow-xl shadow-slate-900/20 dark:shadow-black/40 border border-slate-700/50">

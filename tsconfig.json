@@ -4,6 +4,7 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
+    "types": ["vite-plugin-pwa/client", "vite/client"],
     "lib": [
       "ES2022",
       "DOM",

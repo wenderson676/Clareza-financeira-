@@ -224,7 +224,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
       </header>
 
       {totalProjectedIncome === 0 ? (
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+        <div className="glass-card p-8 text-center">
           <Target className="mx-auto text-slate-300 dark:text-slate-600 mb-4" size={48} />
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Adicione uma Receita</h3>
           <p className="text-slate-500 dark:text-slate-400 text-sm">
@@ -234,7 +234,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
       ) : (
         <>
           {/* Sessão de Análise Inteligente */}
-          <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <div className="glass-card p-6 sm:p-8">
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
               <Activity className="text-emerald-500" size={22} />
               Diagnóstico Estratégico
@@ -287,7 +287,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
+          <div className="glass-card p-6 sm:p-8">
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
               <BarChart4 className="text-emerald-500" size={22} />
               Auditoria de Alocação de Capital
