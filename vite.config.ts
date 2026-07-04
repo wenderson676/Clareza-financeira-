@@ -15,10 +15,21 @@ export default defineConfig(() => {
           name: 'Clareza',
           short_name: 'Clareza',
           description: 'Seu contador financeiro pessoal e inteligente',
-          theme_color: '#ffffff',
-          background_color: '#ffffff',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
           display: 'standalone',
-          icons: []
+          icons: [
+            {
+              src: '/icon-192x192.svg',
+              sizes: '192x192',
+              type: 'image/svg+xml'
+            },
+            {
+              src: '/icon-512x512.svg',
+              sizes: '512x512',
+              type: 'image/svg+xml'
+            }
+          ]
         }
       })
     ],

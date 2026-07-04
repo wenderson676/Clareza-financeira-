@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
-import { HelpCircle, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
+import { HelpCircle, X, Calendar, ArrowRight } from 'lucide-react';
 import { formatCurrency, BUCKETS, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { format, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface DashboardProps {
   data: MonthlyData;
   previousBalance: number;
+  allData: Record<string, MonthlyData>;
 }
 
-export function Dashboard({ data, previousBalance }: DashboardProps) {
+export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
   const [verse, setVerse] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
 
@@ -67,6 +70,36 @@ export function Dashboard({ data, previousBalance }: DashboardProps) {
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#6366f1'];
 
+  const pendingBills = useMemo(() => {
+    return data.transactions
+      .filter(t => t.type === 'expense' && t.isPending)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [data.transactions]);
+
+  const historyData = useMemo(() => {
+    const result = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(new Date(data.monthId + '-01T00:00:00'), i);
+      const mId = format(d, 'yyyy-MM');
+      const mData = allData[mId];
+      
+      let inc = 0;
+      let exp = 0;
+      
+      if (mData) {
+        inc = mData.transactions.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+        exp = mData.transactions.filter(t => t.type === 'expense' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+      }
+      
+      result.push({
+        name: format(d, 'MMM', { locale: ptBR }).toUpperCase(),
+        Receitas: inc,
+        Despesas: exp
+      });
+    }
+    return result;
+  }, [allData, data.monthId]);
+
   return (
     <div className="space-y-6 pb-24">
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors">
@@ -109,6 +142,96 @@ export function Dashboard({ data, previousBalance }: DashboardProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {pendingBills.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Calendar size={18} className="text-rose-500" />
+              Contas a Pagar ({pendingBills.length})
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {pendingBills.slice(0, 3).map(bill => (
+              <div key={bill.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100/50 dark:border-slate-700/50">
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{bill.description}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Vence dia {format(new Date(bill.date + 'T00:00:00'), 'dd/MM')}</span>
+                </div>
+                <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
+                  {formatCurrency(bill.amount)}
+                </span>
+              </div>
+            ))}
+            {pendingBills.length > 3 && (
+              <div className="text-center pt-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400">E mais {pendingBills.length - 3} {pendingBills.length - 3 === 1 ? 'conta' : 'contas'}...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Distribuição de Gastos</h2>
+        
+        {(() => {
+          const CHART_COLORS: Record<string, string> = {
+            'Dízimo': '#10b981', // emerald-500
+            'Necessidades': '#3b82f6', // blue-500
+            'Vida': '#f59e0b', // amber-500
+            'Poupança': '#6366f1' // indigo-500
+          };
+          
+          const pieData = Object.keys(BUCKETS).map((name) => {
+            let spent = 0;
+            if (name === 'Poupança') {
+              spent = netTransfersToSavings;
+            } else {
+              spent = getBucketSpent(name);
+            }
+            return {
+              name,
+              value: spent > 0 ? spent : 0,
+              fill: CHART_COLORS[name]
+            };
+          }).filter(item => item.value > 0);
+
+          if (pieData.length === 0) {
+            return (
+              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
+                Nenhum dado para exibir ainda.
+              </div>
+            );
+          }
+
+          return (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -169,6 +292,27 @@ export function Dashboard({ data, previousBalance }: DashboardProps) {
             </div>
           );
         })}
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Evolução (Últimos 6 meses)</h2>
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={historyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `R$${val/1000}k`} />
+              <RechartsTooltip 
+                cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: 'var(--tw-colors-white, #fff)' }}
+                formatter={(value: number) => formatCurrency(value)}
+              />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+              <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
+              <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-950 text-slate-100 p-8 rounded-3xl relative overflow-hidden shadow-xl shadow-slate-900/20 dark:shadow-black/40 border border-slate-700/50">

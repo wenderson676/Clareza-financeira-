@@ -220,6 +220,10 @@ export function useStore() {
     });
   };
 
+  const importState = (newState: AppState) => {
+    setState(newState);
+  };
+
   return {
     state,
     getCurrentMonthId,
@@ -235,6 +239,7 @@ export function useStore() {
     deleteAsset,
     addGoal,
     deleteGoal,
-    resetStore
+    resetStore,
+    importState
   };
 }

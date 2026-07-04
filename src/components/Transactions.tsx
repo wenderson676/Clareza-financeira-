@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowUpRight, ArrowDownRight, Trash2, ArrowRightLeft, Clock, Pencil, Calendar } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Trash2, ArrowRightLeft, Clock, Pencil, Calendar, Search } from 'lucide-react';
 import { MonthlyData, Transaction } from '../types';
 import { formatCurrency, BUCKETS } from '../lib/utils';
 
@@ -13,9 +13,20 @@ interface TransactionsProps {
 }
 
 export function Transactions({ data, onEdit, onDelete, onTogglePending }: TransactionsProps) {
+  const [searchTerm, setSearchTerm] = useState('');
 
   const groupedTransactions = useMemo(() => {
-    const sorted = [...data.transactions].sort((a, b) => 
+    let filteredTransactions = data.transactions;
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      filteredTransactions = filteredTransactions.filter(t => 
+        t.description.toLowerCase().includes(lowerTerm) || 
+        (t.category && t.category.toLowerCase().includes(lowerTerm)) ||
+        (t.bucket && t.bucket.toLowerCase().includes(lowerTerm))
+      );
+    }
+
+    const sorted = [...filteredTransactions].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
@@ -36,12 +47,25 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
     });
     
     return groups;
-  }, [data.transactions]);
+  }, [data.transactions, searchTerm]);
 
   return (
     <div className="pb-24">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Extrato</h2>
+      </div>
+
+      <div className="mb-6 relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search size={18} className="text-slate-400" />
+        </div>
+        <input
+          type="text"
+          placeholder="Buscar transações..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+        />
       </div>
 
       <div className="space-y-6">

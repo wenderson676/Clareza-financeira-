@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, ListOrdered, BookHeart, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, ListOrdered, BookHeart, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Devotional } from './components/Devotional';
@@ -29,7 +29,8 @@ export default function App() {
     deleteAsset,
     addGoal,
     deleteGoal,
-    resetStore
+    resetStore,
+    importState
   } = useStore();
 
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
@@ -38,6 +39,41 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
+  
+  const handleExportData = () => {
+    const dataStr = JSON.stringify(state, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `clareza-backup-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsedState = JSON.parse(content);
+        if (parsedState && parsedState.monthlyData) {
+          importState(parsedState);
+          alert('Dados importados com sucesso!');
+          setIsSidebarOpen(false);
+        } else {
+          alert('Arquivo de backup inválido.');
+        }
+      } catch (err) {
+        alert('Erro ao importar arquivo.');
+      }
+    };
+    reader.readAsText(file);
+    // clear the input
+    event.target.value = '';
+  };
   
   const monthId = format(currentMonthDate, 'yyyy-MM');
 
@@ -167,6 +203,25 @@ export default function App() {
                     </button>
 
                     <button 
+                      onClick={handleExportData}
+                      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium transition-colors text-left"
+                    >
+                      <Download size={20} />
+                      Fazer Backup (Exportar JSON)
+                    </button>
+
+                    <label className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium transition-colors text-left cursor-pointer">
+                      <Upload size={20} />
+                      Restaurar Backup
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        onChange={handleImportData}
+                      />
+                    </label>
+
+                    <button 
                       onClick={handleResetData}
                       className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium transition-colors text-left"
                     >
@@ -229,7 +284,7 @@ export default function App() {
         {/* Content Area */}
         <main className="flex-1 px-4 py-4 overflow-y-auto">
           {currentTab === 'dashboard' && (
-            <Dashboard data={monthData} previousBalance={getAccumulatedBalance(monthId)} />
+            <Dashboard data={monthData} previousBalance={getAccumulatedBalance(monthId)} allData={state.monthlyData} />
           )}
           {currentTab === 'transactions' && (
             <Transactions 
