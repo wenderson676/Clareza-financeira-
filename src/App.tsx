@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, ListOrdered, BookHeart, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Devotional } from './components/Devotional';
@@ -28,9 +28,11 @@ export default function App() {
     addAsset,
     deleteAsset,
     addGoal,
+    updateGoal,
     deleteGoal,
     resetStore,
-    importState
+    importState,
+    setUserName
   } = useStore();
 
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
@@ -39,6 +41,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
+  const [tempUserName, setTempUserName] = useState('');
   
   const handleExportData = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -178,13 +181,24 @@ export default function App() {
                 className="fixed top-0 left-0 bottom-0 w-3/4 max-w-sm bg-white dark:bg-slate-900 z-50 shadow-2xl flex flex-col"
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 pt-12">
-                  <div className="flex justify-between items-center mb-2">
+                  <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Clareza</h2>
                     <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                       <X size={24} />
                     </button>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Configurações</p>
+                  {state.userName && (
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center font-bold text-xl uppercase">
+                        {state.userName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Olá,</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{state.userName}</p>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">Configurações</p>
                 </div>
                 
                 <div className="p-4 flex-1">
@@ -281,10 +295,61 @@ export default function App() {
           )}
         </AnimatePresence>
 
+        {/* Welcome Modal */}
+        <AnimatePresence>
+          {!state.userName && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 max-w-xl mx-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl max-w-sm w-full border border-slate-100 dark:border-slate-800 text-center"
+              >
+                <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Home size={32} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Bem-vindo(a) à Clareza</h2>
+                <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
+                  Como você gostaria de ser chamado(a)?
+                </p>
+                <input
+                  type="text"
+                  placeholder="Seu nome"
+                  value={tempUserName}
+                  onChange={(e) => setTempUserName(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mb-4 text-center text-lg"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tempUserName.trim()) {
+                      setUserName(tempUserName.trim());
+                    }
+                  }}
+                />
+                <button
+                  disabled={!tempUserName.trim()}
+                  onClick={() => {
+                    if (tempUserName.trim()) {
+                      setUserName(tempUserName.trim());
+                    }
+                  }}
+                  className="w-full py-3 px-4 rounded-xl font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Começar
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Content Area */}
         <main className="flex-1 px-4 py-4 overflow-y-auto">
           {currentTab === 'dashboard' && (
-            <Dashboard data={monthData} previousBalance={getAccumulatedBalance(monthId)} allData={state.monthlyData} />
+            <Dashboard data={monthData} previousBalance={getAccumulatedBalance(monthId)} allData={state.monthlyData} goals={state.goals} addGoal={addGoal} updateGoal={updateGoal} deleteGoal={deleteGoal} />
           )}
           {currentTab === 'transactions' && (
             <Transactions 
@@ -341,7 +406,7 @@ export default function App() {
             onClick={() => setCurrentTab('planning')} 
           />
           <NavItem 
-            icon={<BookHeart size={24} />} 
+            icon={<Lightbulb size={24} />} 
             label="Reflexão" 
             isActive={currentTab === 'devotional'} 
             onClick={() => setCurrentTab('devotional')} 

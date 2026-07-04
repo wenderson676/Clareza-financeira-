@@ -199,6 +199,13 @@ export function useStore() {
     }));
   };
 
+  const updateGoal = (id: string, updatedGoal: Partial<Goal>) => {
+    setState(prev => ({
+      ...prev,
+      goals: prev.goals.map(g => g.id === id ? { ...g, ...updatedGoal } : g)
+    }));
+  };
+
   const deleteGoal = (id: string) => {
     setState(prev => ({
       ...prev,
@@ -224,6 +231,13 @@ export function useStore() {
     setState(newState);
   };
 
+  const setUserName = (name: string) => {
+    setState(prev => ({
+      ...prev,
+      userName: name
+    }));
+  };
+
   return {
     state,
     getCurrentMonthId,
@@ -238,8 +252,10 @@ export function useStore() {
     addAsset,
     deleteAsset,
     addGoal,
+    updateGoal,
     deleteGoal,
     resetStore,
-    importState
+    importState,
+    setUserName
   };
 }

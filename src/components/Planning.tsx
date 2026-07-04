@@ -36,7 +36,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
   const projectedBalance = currentBalance + pendingIncome - pendingExpenses - pendingSavings + pendingSavingsWithdraw;
 
   const getSpentByBucket = (bucket: string, includePending: boolean) => {
-    if (bucket === 'Poupança') {
+    if (bucket === 'Reserva Financeira') {
       const rs = txs.filter(t => t.type === 'transfer_to_savings' && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       const rw = txs.filter(t => t.type === 'transfer_from_savings' && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       return rs - rw;
@@ -48,7 +48,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
 
   const getCategoryTotals = (bucket: string, includePending: boolean) => {
     const cats: Record<string, number> = {};
-    if (bucket === 'Poupança') {
+    if (bucket === 'Reserva Financeira') {
       txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings') && (includePending ? true : !t.isPending))
          .forEach(t => {
            const val = t.type === 'transfer_to_savings' ? t.amount : -t.amount;
@@ -164,11 +164,11 @@ export function Planning({ data, previousBalance }: PlanningProps) {
        });
     }
 
-    // 5. Planejamento de Crescimento (Poupança)
-    const currentSavRealized = getSpentByBucket('Poupança', false);
-    const currentSavPending = getSpentByBucket('Poupança', true) - currentSavRealized;
+    // 5. Planejamento de Crescimento (Reserva Financeira)
+    const currentSavRealized = getSpentByBucket('Reserva Financeira', false);
+    const currentSavPending = getSpentByBucket('Reserva Financeira', true) - currentSavRealized;
     const currentSavTotal = currentSavRealized + currentSavPending;
-    const idealSavings = totalProjectedIncome * BUCKETS['Poupança'].percentage;
+    const idealSavings = totalProjectedIncome * BUCKETS['Reserva Financeira'].percentage;
     
     if (currentSavTotal < idealSavings && projectedBalance > 0) {
       const missingSavings = idealSavings - currentSavTotal;
@@ -329,17 +329,14 @@ export function Planning({ data, previousBalance }: PlanningProps) {
                     </div>
                     
                     <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                      {name === 'Dízimo' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Princípio da Prioridade Absoluta. Separar os 10% iniciais estabelece disciplina sistêmica e alinhamento de propósito antes de qualquer distribuição de recursos.</p>
-                      )}
                       {name === 'Necessidades' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida engessado (moradia, contas, mercado) abaixo de 50% garante elasticidade contra crises financeiras.</p>
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida (moradia, contas, mercado) abaixo de 50% garante elasticidade contra imprevistos financeiros.</p>
                       )}
                       {name === 'Vida' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Qualidade. Teto de 30% destinado ao estilo de vida. É o primeiro centro de custos que deve sofrer cortes drásticos caso o fluxo de caixa fique negativo.</p>
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Qualidade. Teto de 30% destinado ao estilo de vida. É o primeiro centro de custos que deve sofrer cortes caso o orçamento fique apertado.</p>
                       )}
-                      {name === 'Poupança' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador. A retenção mínima de 10% financia seu fundo de emergência (base) e posteriores investimentos (crescimento). É a linha divisória entre sobrevivência e riqueza.</p>
+                      {name === 'Reserva Financeira' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador. A retenção de pelo menos 20% financia seu fundo de emergência e a realização de sonhos. É a linha divisória entre aperto e prosperidade.</p>
                       )}
                     </div>
                   </div>

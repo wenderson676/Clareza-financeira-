@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { HelpCircle, X, Calendar, ArrowRight } from 'lucide-react';
+import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2 } from 'lucide-react';
 import { formatCurrency, BUCKETS, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData } from '../types';
+import { MonthlyData, Goal } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -11,11 +11,18 @@ interface DashboardProps {
   data: MonthlyData;
   previousBalance: number;
   allData: Record<string, MonthlyData>;
+  goals?: Goal[];
+  addGoal?: (goal: Omit<Goal, 'id'>) => void;
+  updateGoal?: (id: string, goal: Partial<Goal>) => void;
+  deleteGoal?: (id: string) => void;
 }
 
-export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
+export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal }: DashboardProps) {
   const [verse, setVerse] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [goalForm, setGoalForm] = useState({ title: '', targetAmount: '', currentAmount: '' });
 
   useEffect(() => {
     setVerse(getRandomVerse());
@@ -100,24 +107,25 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
     return result;
   }, [allData, data.monthId]);
 
+  console.log(BUCKETS);
   return (
     <div className="space-y-6 pb-24">
-      <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors">
-        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Saldo Real</h2>
-        <div className="flex items-center gap-3 mt-1">
+      <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
+        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Saldo Total</h2>
+        <div className="flex justify-center items-center gap-3 mt-1 mb-6">
           <span className={`text-5xl font-black tracking-tight ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
             {formatCurrency(currentBalance)}
           </span>
         </div>
         
-        <div className="mt-8 space-y-3">
+        <div className="space-y-3">
           <div className="flex gap-4 text-sm">
-            <div className="flex-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 p-3 rounded-xl border border-emerald-100 dark:border-emerald-500/20">
-              <div className="text-xs mb-1 opacity-80">Renda Adicionada</div>
+            <div className="flex-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 p-3 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-left">
+              <div className="text-xs mb-1 opacity-80">Entrada</div>
               <div className="font-bold">{formatCurrency(totalIncome)}</div>
             </div>
-            <div className="flex-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 p-3 rounded-xl border border-rose-100 dark:border-rose-500/20">
-              <div className="text-xs mb-1 opacity-80">Gastos</div>
+            <div className="flex-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 p-3 rounded-xl border border-rose-100 dark:border-rose-500/20 text-left">
+              <div className="text-xs mb-1 opacity-80">Saída</div>
               <div className="font-bold">{formatCurrency(totalExpenses)}</div>
             </div>
           </div>
@@ -178,15 +186,14 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
         
         {(() => {
           const CHART_COLORS: Record<string, string> = {
-            'Dízimo': '#10b981', // emerald-500
             'Necessidades': '#3b82f6', // blue-500
             'Vida': '#f59e0b', // amber-500
-            'Poupança': '#6366f1' // indigo-500
+            'Reserva Financeira': '#10b981' // emerald-500
           };
           
           const pieData = Object.keys(BUCKETS).map((name) => {
             let spent = 0;
-            if (name === 'Poupança') {
+            if (name === 'Reserva Financeira') {
               spent = netTransfersToSavings;
             } else {
               spent = getBucketSpent(name);
@@ -194,19 +201,21 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
             return {
               name,
               value: spent > 0 ? spent : 0,
-              fill: CHART_COLORS[name]
+              fill: CHART_COLORS[name] || '#ccc'
             };
           }).filter(item => item.value > 0);
 
           if (pieData.length === 0) {
-            return (
+            console.log(BUCKETS);
+  return (
               <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
                 Nenhum dado para exibir ainda.
               </div>
             );
           }
 
-          return (
+          console.log(BUCKETS);
+  return (
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -243,7 +252,7 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
           let percentSpent = 0;
           let spentLabel = 'Gasto';
           
-          if (name === 'Poupança') {
+          if (name === 'Reserva Financeira') {
             spent = netTransfersToSavings;
             remaining = allocated - spent;
             percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
@@ -254,7 +263,8 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
             percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
           }
           
-          return (
+          console.log(BUCKETS);
+  return (
             <div key={name} className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors relative">
               <button 
                 onClick={() => setActiveInfo(name)}
@@ -295,6 +305,94 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Target size={18} className="text-indigo-500" />
+            Resumo do Cofrinho (Metas e Sonhos)
+          </h2>
+          <button 
+            onClick={() => {
+              setGoalForm({ title: '', targetAmount: '', currentAmount: '' });
+              setEditingGoal(null);
+              setShowGoalForm(true);
+            }}
+            className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+          >
+            <Plus size={14} /> Nova Meta
+          </button>
+        </div>
+        
+        <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
+          <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mb-1 font-medium">Total Guardado (Cofrinho Geral)</p>
+          <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
+            {formatCurrency(
+              Object.values(allData).reduce((sum, month) => {
+                return sum + month.transactions.reduce((mSum, t) => {
+                  if (t.isPending) return mSum;
+                  if (t.type === 'transfer_to_savings') return mSum + t.amount;
+                  if (t.type === 'transfer_from_savings') return mSum - t.amount;
+                  return mSum;
+                }, 0);
+              }, 0)
+            )}
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {goals.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhuma meta criada ainda. O que você deseja conquistar?</p>
+            </div>
+          ) : (
+            goals.map(goal => {
+              const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+              console.log(BUCKETS);
+  return (
+                <div key={goal.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 group">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 className="font-semibold text-slate-800 dark:text-slate-200">{goal.title}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {formatCurrency(goal.currentAmount)} de {formatCurrency(goal.targetAmount)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setGoalForm({ 
+                            title: goal.title, 
+                            targetAmount: goal.targetAmount.toString(), 
+                            currentAmount: goal.currentAmount.toString() 
+                          });
+                          setEditingGoal(goal);
+                          setShowGoalForm(true);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => deleteGoal?.(goal.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-3">
+                    <div 
+                      className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                      style={{ width: `${percent}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Evolução (Últimos 6 meses)</h2>
         <div className="h-56 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -319,7 +417,7 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
         <div className="absolute -top-6 -right-6 p-4 opacity-5 transform rotate-12 scale-150">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
-        <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3">Palavra do Dia</h3>
+        <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3">Sabedoria Financeira</h3>
         <p className="font-serif italic text-lg leading-relaxed text-slate-200 dark:text-slate-300">{verse.split(' - ')[0]}</p>
       </div>
 
@@ -359,6 +457,95 @@ export function Dashboard({ data, previousBalance, allData }: DashboardProps) {
                   className="w-full mt-6 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-medium rounded-xl py-3 transition-colors"
                 >
                   Entendi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {showGoalForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 pb-0 sm:pb-4"
+            onClick={() => setShowGoalForm(false)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-10">
+                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <Target className="text-indigo-500" size={24} />
+                  {editingGoal ? 'Editar Meta' : 'Nova Meta'}
+                </h3>
+                <button onClick={() => setShowGoalForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">O que você quer conquistar?</label>
+                    <input 
+                      type="text" 
+                      value={goalForm.title}
+                      onChange={e => setGoalForm({...goalForm, title: e.target.value})}
+                      placeholder="Ex: Reserva de Emergência, Viagem..."
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qual o valor total necessário?</label>
+                    <input 
+                      type="number" 
+                      value={goalForm.targetAmount}
+                      onChange={e => setGoalForm({...goalForm, targetAmount: e.target.value})}
+                      placeholder="R$ 0,00"
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quanto você já tem guardado?</label>
+                    <input 
+                      type="number" 
+                      value={goalForm.currentAmount}
+                      onChange={e => setGoalForm({...goalForm, currentAmount: e.target.value})}
+                      placeholder="R$ 0,00"
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    if (goalForm.title && goalForm.targetAmount) {
+                      if (editingGoal && updateGoal) {
+                        updateGoal(editingGoal.id, {
+                          title: goalForm.title,
+                          targetAmount: Number(goalForm.targetAmount),
+                          currentAmount: Number(goalForm.currentAmount || 0)
+                        });
+                      } else if (addGoal) {
+                        addGoal({
+                          title: goalForm.title,
+                          targetAmount: Number(goalForm.targetAmount),
+                          currentAmount: Number(goalForm.currentAmount || 0)
+                        });
+                      }
+                      setShowGoalForm(false);
+                    }
+                  }}
+                  disabled={!goalForm.title || !goalForm.targetAmount}
+                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl py-4 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <CheckCircle2 size={20} />
+                  {editingGoal ? 'Salvar Alterações' : 'Criar Meta'}
                 </button>
               </div>
             </motion.div>

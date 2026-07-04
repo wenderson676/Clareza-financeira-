@@ -33,12 +33,12 @@ export function Devotional({ data, onSaveNote }: DevotionalProps) {
   return (
     <div className="space-y-6 pb-24">
       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 transition-colors">
-        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Mordomia & Reflexão</h2>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Reflexão Financeira</h2>
         
         <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl p-5 mb-6 border border-transparent dark:border-emerald-500/20">
           <p className="text-emerald-800 dark:text-emerald-400 text-sm leading-relaxed mb-4">
-            "Aquele que é fiel no pouco, também é fiel no muito."
-            <br/>— Como você viu a provisão de Deus neste mês? Onde você sentiu que poderia ter administrado melhor os recursos que Ele confiou a você?
+            "O controle dos pequenos gastos constrói as grandes riquezas."
+            <br/>— Como você avalia suas escolhas financeiras este mês? Onde você poderia ter administrado melhor os seus recursos?
           </p>
           
           {isEditing ? (

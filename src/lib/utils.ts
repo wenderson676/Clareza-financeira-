@@ -6,16 +6,16 @@ export const formatCurrency = (value: number) => {
 };
 
 export const verses = [
-  "Honra ao Senhor com os teus bens e com as primícias de toda a tua renda. - Provérbios 3:9",
-  "O rico domina sobre os pobres; quem toma emprestado é escravo de quem empresta. - Provérbios 22:7",
-  "Quem é fiel no pouco, também é fiel no muito. - Lucas 16:10",
-  "O dinheiro ganho com desonestidade diminuirá, mas quem o ajunta aos poucos terá cada vez mais. - Provérbios 13:11",
-  "Os planos bem elaborados levam à fartura; mas o apressado sempre acaba na miséria. - Provérbios 21:5",
-  "Pois onde estiver o seu tesouro, aí também estará o seu coração. - Mateus 6:21",
-  "Mas busquem em primeiro lugar o Reino de Deus e a sua justiça, e todas estas coisas lhes serão acrescentadas. - Mateus 6:33",
-  "Ninguém pode servir a dois senhores; pois odiará um e amará o outro, ou se dedicará a um e desprezará o outro. Vocês não podem servir a Deus e ao Dinheiro. - Mateus 6:24",
-  "Mantenham a vida livre do amor ao dinheiro e contentem-se com o que têm. - Hebreus 13:5",
-  "Lembrem-se disto: Quem semeia pouco, também colherá pouco, e quem semeia com fartura, também colherá com fartura. - 2 Coríntios 9:6"
+  "Valorize cada recurso que chega até você; a gratidão multiplica o que temos.",
+  "Evite o endividamento desnecessário, pois quem pega emprestado torna-se servo de quem empresta.",
+  "Aquele que administra bem o pouco, estará preparado para administrar o muito.",
+  "A riqueza conquistada com integridade e paciência cresce de forma sólida; o ganho fácil logo desaparece.",
+  "O planejamento cuidadoso leva à prosperidade, mas a pressa e a impulsividade trazem prejuízos.",
+  "Onde você investe seu dinheiro e seu tempo, ali também estará o seu foco e a sua energia.",
+  "Busque a retidão e o equilíbrio em primeiro lugar, e o bem-estar financeiro será uma consequência natural.",
+  "Não permita que o dinheiro seja o seu mestre; ele deve ser apenas uma ferramenta ao seu dispor.",
+  "Mantenha-se livre da ganância e aprenda a ser grato e satisfeito com o que já possui.",
+  "Lembre-se: quem planta com planejamento e generosidade colherá com fartura, mas quem retém demais acaba na escassez."
 ];
 
 export const getRandomVerse = () => {
@@ -25,24 +25,21 @@ export const getRandomVerse = () => {
 
 // Buckets rules
 export const BUCKETS = {
-  'Dízimo': { percentage: 0.10, color: 'bg-emerald-500', text: 'text-emerald-700' },
   'Necessidades': { percentage: 0.50, color: 'bg-blue-500', text: 'text-blue-700' },
   'Vida': { percentage: 0.30, color: 'bg-amber-500', text: 'text-amber-700' },
-  'Poupança': { percentage: 0.10, color: 'bg-indigo-500', text: 'text-indigo-700' }
+  'Reserva Financeira': { percentage: 0.20, color: 'bg-emerald-500', text: 'text-emerald-700' }
 };
 
 export const BUCKET_EXPLANATIONS = {
-  'Dízimo': 'A décima parte da sua renda dedicada a Deus, como um ato de fé e obediência. Também inclui ofertas.',
   'Necessidades': 'Gastos essenciais para a sobrevivência e trabalho. Ex: Aluguel, alimentação, transporte, luz, água e saúde.',
   'Vida': 'Gastos flexíveis com lazer e estilo de vida. Ex: Restaurantes, viagens, assinaturas (Netflix), compras não essenciais.',
-  'Poupança': 'Dinheiro guardado no seu cofrinho para o futuro. Ex: Fundo de emergência, investimentos, quitação de dívidas e aposentadoria.'
+  'Reserva Financeira': 'Dinheiro guardado no seu cofrinho para o futuro e para a realização de sonhos. Ex: Fundo de emergência, investimentos e aposentadoria.'
 };
 
 export const CATEGORIES = {
   'Necessidades': ['Aluguel/Prestação', 'Alimentação', 'Transporte', 'Contas (Água, Luz, Net)', 'Saúde', 'Educação'],
   'Vida': ['Lazer', 'Restaurantes', 'Compras', 'Assinaturas', 'Cuidados Pessoais', 'Presentes'],
-  'Poupança': ['Transferência para Poupança', 'Resgate da Poupança'],
-  'Dízimo': ['Dízimo', 'Oferta'],
+  'Reserva Financeira': ['Transferência para Reserva', 'Investimento', 'Aporte Cofrinho'],
   'Renda': ['Salário', 'Freelance', 'Renda Extra', 'Rendimento', 'Resgate de Reserva']
 };
 
@@ -98,9 +95,9 @@ const KEYWORD_MAP: Record<string, { formTab: 'expense' | 'income', bucket: any, 
   'roupa': { formTab: 'expense', bucket: 'Vida', category: 'Compras' },
   'tênis': { formTab: 'expense', bucket: 'Vida', category: 'Compras' },
   'presente': { formTab: 'expense', bucket: 'Vida', category: 'Presentes' },
-  'dizimo': { formTab: 'expense', bucket: 'Dízimo', category: 'Dízimo' },
-  'dízimo': { formTab: 'expense', bucket: 'Dízimo', category: 'Dízimo' },
-  'oferta': { formTab: 'expense', bucket: 'Dízimo', category: 'Oferta' },
+  'reserva': { formTab: 'expense', bucket: 'Reserva Financeira', category: 'Transferência para Reserva' },
+  'investimento': { formTab: 'expense', bucket: 'Reserva Financeira', category: 'Investimento' },
+  'cofrinho': { formTab: 'expense', bucket: 'Reserva Financeira', category: 'Aporte Cofrinho' },
   'salário': { formTab: 'income', bucket: 'Renda', category: 'Salário' },
   'salario': { formTab: 'income', bucket: 'Renda', category: 'Salário' },
   'adiantamento': { formTab: 'income', bucket: 'Renda', category: 'Salário' },

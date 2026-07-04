@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense' | 'transfer_to_savings' | 'transfer_from_savings';
-export type Bucket = 'Dízimo' | 'Necessidades' | 'Vida' | 'Poupança' | 'Renda' | 'Transferência';
+export type Bucket = 'Necessidades' | 'Vida' | 'Reserva Financeira' | 'Renda' | 'Transferência';
 
 export interface Transaction {
   id: string;
@@ -37,4 +37,5 @@ export interface AppState {
   monthlyData: Record<string, MonthlyData>;
   goals: Goal[];
   assets: Asset[];
+  userName?: string;
 }
