@@ -21,14 +21,14 @@ export function Planning({ data, previousBalance }: PlanningProps) {
 
   // Calculando valores realizados e pendentes
   const realizedIncome = txs.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedExpenses = txs.filter(t => t.type === 'expense' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedSavings = txs.filter(t => t.type === 'transfer_to_savings' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const realizedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const realizedSavingsWithdraw = txs.filter(t => t.type === 'transfer_from_savings' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const netRealizedSavings = realizedSavings - realizedSavingsWithdraw;
 
   const pendingIncome = txs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingSavings = txs.filter(t => t.type === 'transfer_to_savings' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const pendingSavingsWithdraw = txs.filter(t => t.type === 'transfer_from_savings' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
 
   const currentBalance = previousBalance + realizedIncome - realizedExpenses - netRealizedSavings;
@@ -37,7 +37,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
 
   const getSpentByBucket = (bucket: string, includePending: boolean) => {
     if (bucket === 'Reserva Financeira') {
-      const rs = txs.filter(t => t.type === 'transfer_to_savings' && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
+      const rs = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       const rw = txs.filter(t => t.type === 'transfer_from_savings' && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       return rs - rw;
     }
@@ -49,9 +49,9 @@ export function Planning({ data, previousBalance }: PlanningProps) {
   const getCategoryTotals = (bucket: string, includePending: boolean) => {
     const cats: Record<string, number> = {};
     if (bucket === 'Reserva Financeira') {
-      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings') && (includePending ? true : !t.isPending))
+      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && (includePending ? true : !t.isPending))
          .forEach(t => {
-           const val = t.type === 'transfer_to_savings' ? t.amount : -t.amount;
+           const val = (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) ? t.amount : -t.amount;
            cats[t.category] = (cats[t.category] || 0) + val;
          });
     } else {

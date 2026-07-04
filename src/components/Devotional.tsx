@@ -17,7 +17,7 @@ export function Devotional({ data, onSaveNote }: DevotionalProps) {
     setIsEditing(false);
   };
 
-  const expenses = data.transactions.filter(t => t.type === 'expense');
+  const expenses = data.transactions.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira');
   
   const categoryData = expenses.reduce((acc, curr) => {
     acc[curr.category] = (acc[curr.category] || 0) + curr.amount;

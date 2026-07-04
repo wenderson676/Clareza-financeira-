@@ -86,7 +86,7 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-slate-100 dark:border-slate-800 overflow-hidden transition-colors">
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {group.transactions.map(t => {
-                    const isTransfer = t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings';
+                    const isTransfer = t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira');
                     const isIncome = t.type === 'income' || t.type === 'transfer_from_savings';
                     
                     return (

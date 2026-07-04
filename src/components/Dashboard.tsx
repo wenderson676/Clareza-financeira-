@@ -18,14 +18,14 @@ interface DashboardProps {
 }
 
 export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal }: DashboardProps) {
-  const [verse, setVerse] = useState('');
+  const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const [goalForm, setGoalForm] = useState({ title: '', targetAmount: '', currentAmount: '' });
 
   useEffect(() => {
-    setVerse(getRandomVerse());
+    setQuote(getRandomVerse());
   }, []);
 
   const totalIncome = data.transactions
@@ -33,13 +33,13 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalExpenses = data.transactions
-    .filter(t => t.type === 'expense' && !t.isPending)
+    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending)
     .reduce((sum, t) => sum + t.amount, 0);
 
   const netTransfersToSavings = data.transactions
     .filter(t => !t.isPending)
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings') return sum + t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return sum + t.amount;
       if (t.type === 'transfer_from_savings') return sum - t.amount;
       return sum;
     }, 0);
@@ -51,12 +51,12 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedExpenses = data.transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira')
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedNetTransfersToSavings = data.transactions
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings') return sum + t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return sum + t.amount;
       if (t.type === 'transfer_from_savings') return sum - t.amount;
       return sum;
     }, 0);
@@ -95,7 +95,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
       
       if (mData) {
         inc = mData.transactions.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-        exp = mData.transactions.filter(t => t.type === 'expense' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+        exp = mData.transactions.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
       }
       
       result.push({
@@ -107,7 +107,6 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     return result;
   }, [allData, data.monthId]);
 
-  console.log(BUCKETS);
   return (
     <div className="space-y-6 pb-24">
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
@@ -329,7 +328,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
               Object.values(allData).reduce((sum, month) => {
                 return sum + month.transactions.reduce((mSum, t) => {
                   if (t.isPending) return mSum;
-                  if (t.type === 'transfer_to_savings') return mSum + t.amount;
+                  if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return mSum + t.amount;
                   if (t.type === 'transfer_from_savings') return mSum - t.amount;
                   return mSum;
                 }, 0);
@@ -418,7 +417,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
         <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3">Sabedoria Financeira</h3>
-        <p className="font-serif italic text-lg leading-relaxed text-slate-200 dark:text-slate-300">{verse.split(' - ')[0]}</p>
+        <p className="font-serif italic text-lg leading-relaxed text-slate-200 dark:text-slate-300">{quote}</p>
       </div>
 
       <AnimatePresence>
