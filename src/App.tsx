@@ -9,7 +9,8 @@ import { useStore } from './lib/store';
 import { format, addMonths, subMonths, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
-import { Transaction } from './types';
+import { Transaction, BudgetMode } from './types';
+import { BUDGET_MODES_INFO } from './lib/utils';
 
 type Tab = 'dashboard' | 'transactions' | 'planning' | 'comparison';
 
@@ -32,7 +33,8 @@ export default function App() {
     deleteGoal,
     resetStore,
     importState,
-    setUserName
+    setUserName,
+    setBudgetMode
   } = useStore();
 
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
@@ -42,6 +44,9 @@ export default function App() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [tempUserName, setTempUserName] = useState('');
+  const [showWelcomeModal, setShowWelcomeModal] = useState(() => !state.userName);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [selectedBudgetMode, setSelectedBudgetMode] = useState<BudgetMode>('50-30-20');
   
   const handleExportData = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -216,6 +221,22 @@ export default function App() {
                       </div>
                     </button>
 
+                    <div className="w-full p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left flex flex-col gap-1.5">
+                      <div className="flex items-center gap-3 text-slate-700 dark:text-slate-200 font-medium text-sm">
+                        <Target size={20} className="text-emerald-500" />
+                        Modo de Orçamento
+                      </div>
+                      <select
+                        value={state.budgetMode || '50-30-20'}
+                        onChange={(e) => setBudgetMode(e.target.value as BudgetMode)}
+                        className="w-full mt-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                      >
+                        <option value="50-30-20">Padrão (50/30/20)</option>
+                        <option value="80-10-10">Sobrevivência (80/10/10)</option>
+                        <option value="90-5-5">Crise (90/5/5)</option>
+                      </select>
+                    </div>
+
                     <button 
                       onClick={handleExportData}
                       className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium transition-colors text-left"
@@ -297,7 +318,7 @@ export default function App() {
 
         {/* Welcome Modal */}
         <AnimatePresence>
-          {!state.userName && (
+          {showWelcomeModal && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -308,39 +329,92 @@ export default function App() {
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl max-w-sm w-full border border-slate-100 dark:border-slate-800 text-center"
+                className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl max-w-md w-full border border-slate-100 dark:border-slate-800 text-center max-h-[90vh] overflow-y-auto"
               >
-                <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Home size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Bem-vindo(a) à Clareza Financeira</h2>
-                <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
-                  Como você gostaria de ser chamado(a)?
-                </p>
-                <input
-                  type="text"
-                  placeholder="Seu nome"
-                  value={tempUserName}
-                  onChange={(e) => setTempUserName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mb-4 text-center text-lg"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && tempUserName.trim()) {
-                      setUserName(tempUserName.trim());
-                    }
-                  }}
-                />
-                <button
-                  disabled={!tempUserName.trim()}
-                  onClick={() => {
-                    if (tempUserName.trim()) {
-                      setUserName(tempUserName.trim());
-                    }
-                  }}
-                  className="w-full py-3 px-4 rounded-xl font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Começar
-                </button>
+                {onboardingStep === 1 ? (
+                  <>
+                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Home size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Bem-vindo(a) à Clareza Financeira</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
+                      Como você gostaria de ser chamado(a)?
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Seu nome"
+                      value={tempUserName}
+                      onChange={(e) => setTempUserName(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mb-6 text-center text-lg font-medium"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && tempUserName.trim()) {
+                          setOnboardingStep(2);
+                        }
+                      }}
+                    />
+                    <button
+                      disabled={!tempUserName.trim()}
+                      onClick={() => setOnboardingStep(2)}
+                      className="w-full py-3.5 px-4 rounded-xl font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-base flex justify-center items-center gap-2 shadow-lg shadow-emerald-200 dark:shadow-emerald-900/10"
+                    >
+                      Avançar
+                      <ChevronRight size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-1">Olá, {tempUserName}!</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
+                      Escolha o modo de divisão financeira ideal para o seu momento atual:
+                    </p>
+                    
+                    <div className="space-y-4 mb-6">
+                      {Object.entries(BUDGET_MODES_INFO).map(([key, modeInfo]) => {
+                        const isSelected = selectedBudgetMode === key;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setSelectedBudgetMode(key as BudgetMode)}
+                            className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                              isSelected 
+                                ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-500/5 shadow-sm' 
+                                : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{modeInfo.name}</span>
+                              {isSelected && <span className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0" />}
+                            </div>
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mb-2">{modeInfo.description}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-normal">{modeInfo.explanation}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setOnboardingStep(1)}
+                        className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium transition-colors text-sm"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (tempUserName.trim()) {
+                            setUserName(tempUserName.trim());
+                            setBudgetMode(selectedBudgetMode);
+                            setShowWelcomeModal(false);
+                          }
+                        }}
+                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors text-sm shadow-lg shadow-emerald-200 dark:shadow-emerald-900/10"
+                      >
+                        Começar
+                      </button>
+                    </div>
+                  </>
+                )}
               </motion.div>
             </motion.div>
           )}
@@ -358,6 +432,7 @@ export default function App() {
               updateGoal={updateGoal} 
               deleteGoal={deleteGoal}
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
+              budgetMode={state.budgetMode || '50-30-20'}
             />
           )}
           {currentTab === 'transactions' && (
@@ -369,7 +444,11 @@ export default function App() {
             />
           )}
           {currentTab === 'planning' && (
-            <Planning data={monthData} previousBalance={getAccumulatedBalance(monthId)} />
+            <Planning 
+              data={monthData} 
+              previousBalance={getAccumulatedBalance(monthId)} 
+              budgetMode={state.budgetMode || '50-30-20'}
+            />
           )}
           {currentTab === 'comparison' && (
             <Comparison allData={state.monthlyData} />

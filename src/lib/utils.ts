@@ -26,20 +26,50 @@ export const getRandomVerse = () => {
 // Buckets rules
 export const BUCKETS = {
   'Necessidades': { percentage: 0.50, color: 'bg-blue-500', text: 'text-blue-700' },
-  'Vida': { percentage: 0.30, color: 'bg-amber-500', text: 'text-amber-700' },
-  'Reserva Financeira': { percentage: 0.20, color: 'bg-emerald-500', text: 'text-emerald-700' }
+  'Desejos': { percentage: 0.30, color: 'bg-amber-500', text: 'text-amber-700' },
+  'Reserva/Dívidas': { percentage: 0.20, color: 'bg-emerald-500', text: 'text-emerald-700' }
+};
+
+export const BUDGET_MODES_INFO = {
+  '50-30-20': {
+    name: 'Padrão (50/30/20)',
+    description: '50% Necessidades, 30% Desejos, 20% Reserva/Dívidas',
+    explanation: 'Ideal para momentos de estabilidade financeira, onde você consegue equilibrar gastos essenciais, lazer e construir patrimônio de forma consistente.',
+    ratios: { 'Necessidades': 0.50, 'Desejos': 0.30, 'Reserva/Dívidas': 0.20 }
+  },
+  '80-10-10': {
+    name: 'Sobrevivência (80/10/10)',
+    description: '80% Necessidades, 10% Desejos, 10% Reserva/Dívidas',
+    explanation: 'Ideal para momentos em que a renda diminuiu ou as contas básicas aumentaram. Foca no essencial para manter o orçamento equilibrado em tempos difíceis.',
+    ratios: { 'Necessidades': 0.80, 'Desejos': 0.10, 'Reserva/Dívidas': 0.10 }
+  },
+  '90-5-5': {
+    name: 'Crise (90/5/5)',
+    description: '90% Necessidades, 5% Desejos, 5% Reserva/Dívidas',
+    explanation: 'Ideal para emergências graves, desemprego ou quando a renda cobre apenas o essencial de sobrevivência. Reduz os gastos supérfluos quase a zero.',
+    ratios: { 'Necessidades': 0.90, 'Desejos': 0.05, 'Reserva/Dívidas': 0.05 }
+  }
+};
+
+export const getBucketsConfig = (mode: '50-30-20' | '80-10-10' | '90-5-5' = '50-30-20') => {
+  const currentModeInfo = BUDGET_MODES_INFO[mode] || BUDGET_MODES_INFO['50-30-20'];
+  return {
+    'Necessidades': { percentage: currentModeInfo.ratios['Necessidades'], color: 'bg-blue-500', text: 'text-blue-700' },
+    'Desejos': { percentage: currentModeInfo.ratios['Desejos'], color: 'bg-amber-500', text: 'text-amber-700' },
+    'Reserva/Dívidas': { percentage: currentModeInfo.ratios['Reserva/Dívidas'], color: 'bg-emerald-500', text: 'text-emerald-700' }
+  };
 };
 
 export const BUCKET_EXPLANATIONS = {
   'Necessidades': 'Gastos essenciais para a sobrevivência e trabalho. Ex: Aluguel, alimentação, transporte, luz, água e saúde.',
-  'Vida': 'Gastos flexíveis com lazer e estilo de vida. Ex: Restaurantes, viagens, assinaturas (Netflix), compras não essenciais.',
-  'Reserva Financeira': 'Dinheiro guardado no seu cofrinho para o futuro e para a realização de sonhos. Ex: Fundo de emergência, investimentos e aposentadoria.'
+  'Desejos': 'Gastos flexíveis com lazer e estilo de vida. Ex: Restaurantes, viagens, assinaturas (Netflix), compras não essenciais.',
+  'Reserva/Dívidas': 'Dinheiro guardado no seu cofrinho para o futuro, investimentos ou amortização de dívidas.'
 };
 
 export const CATEGORIES = {
   'Necessidades': ['Aluguel/Prestação', 'Alimentação', 'Transporte', 'Contas (Água, Luz, Net)', 'Saúde', 'Educação'],
-  'Vida': ['Lazer', 'Restaurantes', 'Compras', 'Assinaturas', 'Cuidados Pessoais', 'Presentes'],
-  'Reserva Financeira': ['Transferência para Reserva', 'Investimento', 'Aporte Cofrinho'],
+  'Desejos': ['Lazer', 'Restaurantes', 'Compras', 'Assinaturas', 'Cuidados Pessoais', 'Presentes'],
+  'Reserva/Dívidas': ['Transferência para Reserva', 'Investimento', 'Aporte Cofrinho', 'Pagamento de Dívidas'],
   'Renda': ['Salário', 'Freelance', 'Renda Extra', 'Rendimento', 'Resgate de Reserva']
 };
 

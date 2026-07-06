@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { MonthlyData } from '../types';
-import { BUCKETS, formatCurrency } from '../lib/utils';
+import { MonthlyData, BudgetMode } from '../types';
+import { getBucketsConfig, formatCurrency } from '../lib/utils';
 import { Target, TrendingUp, AlertTriangle, CheckCircle2, Compass, Activity, ArrowRight, BrainCircuit, BarChart4 } from 'lucide-react';
 
 interface PlanningProps {
   data: MonthlyData;
   previousBalance: number;
+  budgetMode?: BudgetMode;
 }
 
 interface StrategyItem {
@@ -16,19 +17,20 @@ interface StrategyItem {
   actionable: string;
 }
 
-export function Planning({ data, previousBalance }: PlanningProps) {
+export function Planning({ data, previousBalance, budgetMode = '50-30-20' }: PlanningProps) {
   const txs = data.transactions;
+  const modeBuckets = useMemo(() => getBucketsConfig(budgetMode) as Record<string, { percentage: number; color: string; text: string }>, [budgetMode]);
 
   // Calculando valores realizados e pendentes
   const realizedIncome = txs.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const realizedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const realizedSavingsWithdraw = txs.filter(t => t.type === 'transfer_from_savings' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const netRealizedSavings = realizedSavings - realizedSavingsWithdraw;
 
   const pendingIncome = txs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const pendingSavingsWithdraw = txs.filter(t => t.type === 'transfer_from_savings' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
 
   const currentBalance = previousBalance + realizedIncome - realizedExpenses - netRealizedSavings;
@@ -36,8 +38,8 @@ export function Planning({ data, previousBalance }: PlanningProps) {
   const projectedBalance = currentBalance + pendingIncome - pendingExpenses - pendingSavings + pendingSavingsWithdraw;
 
   const getSpentByBucket = (bucket: string, includePending: boolean) => {
-    if (bucket === 'Reserva Financeira') {
-      const rs = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
+    if (bucket === 'Reserva/Dívidas') {
+      const rs = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       const rw = txs.filter(t => t.type === 'transfer_from_savings' && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
       return rs - rw;
     }
@@ -48,10 +50,10 @@ export function Planning({ data, previousBalance }: PlanningProps) {
 
   const getCategoryTotals = (bucket: string, includePending: boolean) => {
     const cats: Record<string, number> = {};
-    if (bucket === 'Reserva Financeira') {
-      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) && (includePending ? true : !t.isPending))
+    if (bucket === 'Reserva/Dívidas') {
+      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) && (includePending ? true : !t.isPending))
          .forEach(t => {
-           const val = (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) ? t.amount : -t.amount;
+           const val = (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) ? t.amount : -t.amount;
            cats[t.category] = (cats[t.category] || 0) + val;
          });
     } else {
@@ -89,9 +91,10 @@ export function Planning({ data, previousBalance }: PlanningProps) {
         // Encontra a área com maior excesso
         let worstBucket = '';
         let maxOver = 0;
-        Object.entries(BUCKETS).forEach(([b, conf]) => {
+        Object.entries(modeBuckets).forEach(([b, conf]) => {
+          const config = conf as { percentage: number; color: string; text: string };
           const spent = getSpentByBucket(b, true);
-          const allocated = totalProjectedIncome * conf.percentage;
+          const allocated = totalProjectedIncome * config.percentage;
           if (spent - allocated > maxOver) {
             maxOver = spent - allocated;
             worstBucket = b;
@@ -126,22 +129,22 @@ export function Planning({ data, previousBalance }: PlanningProps) {
     }
 
     // 3. Análise Dinâmica para Otimização
-    const vidaCategories = getCategoryTotals('Vida', true);
-    const vidaTotalRealized = getSpentByBucket('Vida', false);
-    const vidaTotalPending = getSpentByBucket('Vida', true) - vidaTotalRealized;
+    const vidaCategories = getCategoryTotals('Desejos', true);
+    const vidaTotalRealized = getSpentByBucket('Desejos', false);
+    const vidaTotalPending = getSpentByBucket('Desejos', true) - vidaTotalRealized;
     const vidaTotal = vidaTotalRealized + vidaTotalPending;
     
-    if (vidaTotal > (totalProjectedIncome * BUCKETS['Vida'].percentage)) {
+    if (vidaTotal > (totalProjectedIncome * modeBuckets['Desejos'].percentage)) {
       if (vidaCategories.length > 0) {
         const biggestDrain = vidaCategories[0];
         const drainPercent = (biggestDrain[1] / vidaTotal) * 100;
-        const overAmount = vidaTotal - (totalProjectedIncome * BUCKETS['Vida'].percentage);
+        const overAmount = vidaTotal - (totalProjectedIncome * modeBuckets['Desejos'].percentage);
         
         strat.push({
           id: 'pareto-vida',
           type: 'warning',
-          title: 'Estilo de Vida consumindo acima do limite',
-          description: `Os gastos (pagos + futuros) com "Vida" (lazer, supérfluos) já somam ${formatCurrency(vidaTotal)} e estouram o teto ideal de 30% em ${formatCurrency(overAmount)}. Cerca de ${drainPercent.toFixed(0)}% deste valor está concentrado em "${biggestDrain[0]}".`,
+          title: 'Desejos consumindo acima do limite',
+          description: `Os gastos (pagos + futuros) com "Desejos" (lazer, supérfluos) já somam ${formatCurrency(vidaTotal)} e estouram o teto ideal de ${(modeBuckets['Desejos'].percentage * 100).toFixed(0)}% em ${formatCurrency(overAmount)}. Cerca de ${drainPercent.toFixed(0)}% deste valor está concentrado em "${biggestDrain[0]}".`,
           actionable: `Sugestão de Contador: Para voltar aos trilhos sem dor, corte ou reduza drasticamente as próximas despesas com "${biggestDrain[0]}". Se houverem despesas futuras pendentes nessa categoria, tente cancelá-las.`
         });
       }
@@ -151,7 +154,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
     const necessidadesRealized = getSpentByBucket('Necessidades', false);
     const necessidadesPending = getSpentByBucket('Necessidades', true) - necessidadesRealized;
     const necessidadesTotal = necessidadesRealized + necessidadesPending;
-    const necessidadesLimit = totalProjectedIncome * BUCKETS['Necessidades'].percentage;
+    const necessidadesLimit = totalProjectedIncome * modeBuckets['Necessidades'].percentage;
     
     if (necessidadesTotal > necessidadesLimit) {
        const overAmount = necessidadesTotal - necessidadesLimit;
@@ -159,16 +162,16 @@ export function Planning({ data, previousBalance }: PlanningProps) {
          id: `bucket-necessidades-high`,
          type: 'warning',
          title: `Custo de Vida Básico Elevado`,
-         description: `Seus custos de vida essenciais (já pagos: ${formatCurrency(necessidadesRealized)} | a pagar: ${formatCurrency(necessidadesPending)}) comprometem mais de 50% da sua renda total projetada, excedendo o limite saudável em ${formatCurrency(overAmount)}.`,
-         actionable: `Sugestão de Contador: Custos fixos altos deixam você sem margem de manobra. Avalie suas contas futuras e veja se pode renegociar contratos (aluguel, internet) ou mudar hábitos de consumo no supermercado.`
+         description: `Seus custos de vida essenciais (já pagos: ${formatCurrency(necessidadesRealized)} | a pagar: ${formatCurrency(necessidadesPending)}) comprometem mais de ${(modeBuckets['Necessidades'].percentage * 100).toFixed(0)}% da sua renda total projetada, excedendo o limite saudável em ${formatCurrency(overAmount)}.`,
+         actionable: `Sugestão de Contador: Custos fixos altos deixam você sem margem de manobra. Avalie suas contas futures e veja se pode renegociar contratos (aluguel, internet) ou mudar hábitos de consumo no supermercado.`
        });
     }
 
     // 5. Planejamento de Crescimento (Reserva Financeira)
-    const currentSavRealized = getSpentByBucket('Reserva Financeira', false);
-    const currentSavPending = getSpentByBucket('Reserva Financeira', true) - currentSavRealized;
+    const currentSavRealized = getSpentByBucket('Reserva/Dívidas', false);
+    const currentSavPending = getSpentByBucket('Reserva/Dívidas', true) - currentSavRealized;
     const currentSavTotal = currentSavRealized + currentSavPending;
-    const idealSavings = totalProjectedIncome * BUCKETS['Reserva Financeira'].percentage;
+    const idealSavings = totalProjectedIncome * modeBuckets['Reserva/Dívidas'].percentage;
     
     if (currentSavTotal < idealSavings && projectedBalance > 0) {
       const missingSavings = idealSavings - currentSavTotal;
@@ -176,7 +179,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
         id: `savings-growth`,
         type: 'info',
         title: 'Oportunidade para Aumentar a Reserva',
-        description: `Você separou ${formatCurrency(currentSavRealized)} já transferidos (mais ${formatCurrency(currentSavPending)} planejados) para economia. O alvo ideal para o seu salário seria no mínimo ${formatCurrency(idealSavings)}. Como há uma sobra projetada no seu caixa, podemos melhorar isso!`,
+        description: `Você separou ${formatCurrency(currentSavRealized)} já transferidos (mais ${formatCurrency(currentSavPending)} planejados) para economia ou pagamento de dívidas. O alvo ideal para o seu salário seria no mínimo ${formatCurrency(idealSavings)}. Como há uma sobra projetada no seu caixa, podemos melhorar isso!`,
         actionable: projectedBalance >= missingSavings 
           ? `Sugestão de Contador: Registre agora uma transferência futura de ${formatCurrency(missingSavings)} para a sua poupança ou investimentos. Acostume-se a investir a diferença antes de gastar com outras coisas.` 
           : `Sugestão de Contador: A previsão é sobrar cerca de ${formatCurrency(projectedBalance)} após o pagamento de tudo. Planeje alocar todo esse saldo diretamente para a poupança.`
@@ -294,7 +297,8 @@ export function Planning({ data, previousBalance }: PlanningProps) {
             </h3>
             
             <div className="space-y-8">
-              {Object.entries(BUCKETS).map(([name, config]) => {
+              {Object.entries(modeBuckets).map(([name, conf]) => {
+                const config = conf as { percentage: number; color: string; text: string };
                 const allocated = totalProjectedIncome * config.percentage;
                 const spent = getSpentByBucket(name, true);
                 const status = getStatus(spent, allocated);
@@ -303,7 +307,7 @@ export function Planning({ data, previousBalance }: PlanningProps) {
                   <div key={name} className="relative">
                     <div className="flex justify-between items-end mb-3">
                       <div>
-                        <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">{name} <span className="text-slate-400 font-medium text-sm ml-1">(Teto de {config.percentage * 100}%)</span></h4>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">{name} <span className="text-slate-400 font-medium text-sm ml-1">(Teto de {(config.percentage * 100).toFixed(0)}%)</span></h4>
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
                           Consolidado: {formatCurrency(spent)} <span className="mx-1 text-slate-300 dark:text-slate-600">/</span> {formatCurrency(allocated)}
                         </p>
@@ -330,13 +334,13 @@ export function Planning({ data, previousBalance }: PlanningProps) {
                     
                     <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                       {name === 'Necessidades' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida (moradia, contas, mercado) abaixo de 50% garante elasticidade contra imprevistos financeiros.</p>
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida (moradia, contas, mercado) abaixo de {(config.percentage * 100).toFixed(0)}% garante elasticidade contra imprevistos financeiros.</p>
                       )}
-                      {name === 'Vida' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Qualidade. Teto de 30% destinado ao estilo de vida. É o primeiro centro de custos que deve sofrer cortes caso o orçamento fique apertado.</p>
+                      {name === 'Desejos' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Conforto. Limite de {(config.percentage * 100).toFixed(0)}% destinado ao estilo de vida e escolhas pessoais. É o primeiro centro de custos que deve sofrer cortes em tempos difíceis.</p>
                       )}
-                      {name === 'Reserva Financeira' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador. A retenção de pelo menos 20% financia seu fundo de emergência e a realização de sonhos. É a linha divisória entre aperto e prosperidade.</p>
+                      {name === 'Reserva/Dívidas' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador e Segurança. A retenção ou amortização de {(config.percentage * 100).toFixed(0)}% acelera sua saída de dívidas, financiando seu colchão de segurança e o futuro.</p>
                       )}
                     </div>
                   </div>

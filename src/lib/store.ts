@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket } from '../types';
+import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket, BudgetMode } from '../types';
 import { format, subMonths, parse } from 'date-fns';
 
 const STORAGE_KEY = 'mordomia_simples_data';
@@ -238,6 +238,13 @@ export function useStore() {
     }));
   };
 
+  const setBudgetMode = (mode: BudgetMode) => {
+    setState(prev => ({
+      ...prev,
+      budgetMode: mode
+    }));
+  };
+
   return {
     state,
     getCurrentMonthId,
@@ -256,6 +263,7 @@ export function useStore() {
     deleteGoal,
     resetStore,
     importState,
-    setUserName
+    setUserName,
+    setBudgetMode
   };
 }

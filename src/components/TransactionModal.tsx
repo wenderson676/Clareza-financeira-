@@ -89,7 +89,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
     } else if (formTab === 'transfer') {
       finalType = transferDirection === 'to_savings' ? 'transfer_to_savings' : 'transfer_from_savings';
       finalBucket = 'Transferência';
-      finalCategory = transferDirection === 'to_savings' ? 'Transferência para Reserva Financeira' : 'Resgate da Reserva Financeira';
+      finalCategory = transferDirection === 'to_savings' ? 'Transferência para Reserva/Dívidas' : 'Resgate de Reserva/Dívidas';
     } else {
       finalType = 'expense';
     }
@@ -173,8 +173,8 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
                     onChange={e => setTransferDirection(e.target.value as 'to_savings' | 'from_savings')}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                   >
-                    <option value="to_savings">Saldo → Reserva Financeira (Cofrinho)</option>
-                    <option value="from_savings">Reserva Financeira (Cofrinho) → Saldo</option>
+                    <option value="to_savings">Saldo → Reserva/Dívidas (Cofrinho)</option>
+                    <option value="from_savings">Reserva/Dívidas (Cofrinho) → Saldo</option>
                   </select>
                 </div>
               )}
@@ -243,8 +243,8 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                     >
                       <option value="Necessidades">Necessidades</option>
-                      <option value="Vida">Vida</option>
-                      <option value="Reserva Financeira">Reserva Financeira</option>
+                      <option value="Desejos">Desejos</option>
+                      <option value="Reserva/Dívidas">Reserva/Dívidas</option>
                     </select>
                   </div>
                 )}

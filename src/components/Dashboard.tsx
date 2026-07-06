@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb } from 'lucide-react';
-import { formatCurrency, BUCKETS, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData, Goal } from '../types';
+import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
+import { MonthlyData, Goal, BudgetMode } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,9 +16,10 @@ interface DashboardProps {
   updateGoal?: (id: string, goal: Partial<Goal>) => void;
   deleteGoal?: (id: string) => void;
   onSaveNote?: (note: string) => void;
+  budgetMode?: BudgetMode;
 }
 
-export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal, onSaveNote }: DashboardProps) {
+export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal, onSaveNote, budgetMode = '50-30-20' }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -27,6 +28,8 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
   
   const [note, setNote] = useState(data.devotionalNote || '');
   const [isEditingNote, setIsEditingNote] = useState(false);
+
+  const modeBuckets = useMemo(() => getBucketsConfig(budgetMode), [budgetMode]);
 
   useEffect(() => {
     setQuote(getRandomVerse());
@@ -41,13 +44,13 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalExpenses = data.transactions
-    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending)
+    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending)
     .reduce((sum, t) => sum + t.amount, 0);
 
   const netTransfersToSavings = data.transactions
     .filter(t => !t.isPending)
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return sum + t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return sum + t.amount;
       if (t.type === 'transfer_from_savings') return sum - t.amount;
       return sum;
     }, 0);
@@ -59,12 +62,12 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedExpenses = data.transactions
-    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira')
+    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas')
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedNetTransfersToSavings = data.transactions
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return sum + t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return sum + t.amount;
       if (t.type === 'transfer_from_savings') return sum - t.amount;
       return sum;
     }, 0);
@@ -77,11 +80,14 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const chartData = Object.entries(BUCKETS).map(([key, config]) => ({
-    name: key,
-    value: getBucketSpent(key) > 0 ? getBucketSpent(key) : 1, // Minimum for visual
-    color: config.color.replace('bg-', '')
-  }));
+  const chartData = Object.entries(modeBuckets).map(([key, conf]) => {
+    const config = conf as { percentage: number; color: string; text: string };
+    return {
+      name: key,
+      value: getBucketSpent(key) > 0 ? getBucketSpent(key) : 1, // Minimum for visual
+      color: config.color.replace('bg-', '')
+    };
+  });
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#6366f1'];
 
@@ -103,7 +109,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
       
       if (mData) {
         inc = mData.transactions.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-        exp = mData.transactions.filter(t => t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+        exp = mData.transactions.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
       }
       
       result.push({
@@ -194,13 +200,13 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
         {(() => {
           const CHART_COLORS: Record<string, string> = {
             'Necessidades': '#3b82f6', // blue-500
-            'Vida': '#f59e0b', // amber-500
-            'Reserva Financeira': '#10b981' // emerald-500
+            'Desejos': '#f59e0b', // amber-500
+            'Reserva/Dívidas': '#10b981' // emerald-500
           };
           
-          const pieData = Object.keys(BUCKETS).map((name) => {
+          const pieData = Object.keys(modeBuckets).map((name) => {
             let spent = 0;
-            if (name === 'Reserva Financeira') {
+            if (name === 'Reserva/Dívidas') {
               spent = netTransfersToSavings;
             } else {
               spent = getBucketSpent(name);
@@ -213,16 +219,14 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           }).filter(item => item.value > 0);
 
           if (pieData.length === 0) {
-            console.log(BUCKETS);
-  return (
+            return (
               <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
                 Nenhum dado para exibir ainda.
               </div>
             );
           }
 
-          console.log(BUCKETS);
-  return (
+          return (
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -251,7 +255,8 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.entries(BUCKETS).map(([name, config]) => {
+        {Object.entries(modeBuckets).map(([name, conf]) => {
+          const config = conf as { percentage: number; color: string; text: string };
           const allocated = totalIncome * config.percentage;
           
           let spent = 0;
@@ -259,7 +264,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           let percentSpent = 0;
           let spentLabel = 'Gasto';
           
-          if (name === 'Reserva Financeira') {
+          if (name === 'Reserva/Dívidas') {
             spent = netTransfersToSavings;
             remaining = allocated - spent;
             percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
@@ -270,8 +275,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
             percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
           }
           
-          console.log(BUCKETS);
-  return (
+          return (
             <div key={name} className="glass-card p-6 relative">
               <button 
                 onClick={() => setActiveInfo(name)}
@@ -336,7 +340,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
               Object.values(allData).reduce((sum, month) => {
                 return sum + month.transactions.reduce((mSum, t) => {
                   if (t.isPending) return mSum;
-                  if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira')) return mSum + t.amount;
+                  if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return mSum + t.amount;
                   if (t.type === 'transfer_from_savings') return mSum - t.amount;
                   return mSum;
                 }, 0);
@@ -353,8 +357,7 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           ) : (
             goals.map(goal => {
               const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-              console.log(BUCKETS);
-  return (
+              return (
                 <div key={goal.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 group">
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -512,8 +515,8 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${BUCKETS[activeInfo as keyof typeof BUCKETS].color} bg-opacity-20`}>
-                      <div className={`w-4 h-4 rounded-full ${BUCKETS[activeInfo as keyof typeof BUCKETS].color}`}></div>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${modeBuckets[activeInfo as keyof typeof modeBuckets]?.color || ''} bg-opacity-20`}>
+                      <div className={`w-4 h-4 rounded-full ${modeBuckets[activeInfo as keyof typeof modeBuckets]?.color || ''}`}></div>
                     </div>
                     <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{activeInfo}</h3>
                   </div>

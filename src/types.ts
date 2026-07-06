@@ -1,5 +1,6 @@
 export type TransactionType = 'income' | 'expense' | 'transfer_to_savings' | 'transfer_from_savings';
-export type Bucket = 'Necessidades' | 'Vida' | 'Reserva Financeira' | 'Renda' | 'Transferência';
+export type Bucket = 'Necessidades' | 'Desejos' | 'Reserva/Dívidas' | 'Renda' | 'Transferência';
+export type BudgetMode = '50-30-20' | '80-10-10' | '90-5-5';
 
 export interface Transaction {
   id: string;
@@ -38,4 +39,5 @@ export interface AppState {
   goals: Goal[];
   assets: Asset[];
   userName?: string;
+  budgetMode?: BudgetMode;
 }
