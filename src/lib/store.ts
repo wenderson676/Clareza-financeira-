@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket, BudgetMode } from '../types';
+import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket, BudgetMode, Debt } from '../types';
 import { format, subMonths, parse } from 'date-fns';
 
 const STORAGE_KEY = 'mordomia_simples_data';
@@ -7,7 +7,8 @@ const STORAGE_KEY = 'mordomia_simples_data';
 const defaultState: AppState = {
   monthlyData: {},
   goals: [],
-  assets: []
+  assets: [],
+  debts: []
 };
 
 export function useStore() {
@@ -213,6 +214,27 @@ export function useStore() {
     }));
   };
 
+  const addDebt = (debt: Omit<Debt, 'id'>) => {
+    setState(prev => ({
+      ...prev,
+      debts: [...(prev.debts || []), { ...debt, id: crypto.randomUUID() }]
+    }));
+  };
+
+  const updateDebt = (id: string, updatedDebt: Partial<Debt>) => {
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).map(d => d.id === id ? { ...d, ...updatedDebt } : d)
+    }));
+  };
+
+  const deleteDebt = (id: string) => {
+    setState(prev => ({
+      ...prev,
+      debts: (prev.debts || []).filter(d => d.id !== id)
+    }));
+  };
+
   const resetStore = () => {
     const monthId = format(new Date(), 'yyyy-MM');
     setState({
@@ -223,7 +245,8 @@ export function useStore() {
         }
       },
       goals: [],
-      assets: []
+      assets: [],
+      debts: []
     });
   };
 
@@ -261,6 +284,9 @@ export function useStore() {
     addGoal,
     updateGoal,
     deleteGoal,
+    addDebt,
+    updateDebt,
+    deleteDebt,
     resetStore,
     importState,
     setUserName,

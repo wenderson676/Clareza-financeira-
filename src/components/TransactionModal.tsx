@@ -76,6 +76,10 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    handleSaveTransaction(true);
+  };
+
+  const handleSaveTransaction = (shouldClose: boolean) => {
     const parsedAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
     if (!parsedAmount || isNaN(parsedAmount) || !description || (formTab !== 'transfer' && !category)) return;
 
@@ -104,7 +108,13 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
       isPending
     });
 
-    onClose();
+    if (shouldClose) {
+      onClose();
+    } else {
+      setAmount('');
+      setDescription('');
+      setCategory('');
+    }
   };
 
   return (
@@ -282,12 +292,23 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
                 </label>
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl py-4 transition-colors mt-6"
-              >
-                {editingTransaction ? 'Atualizar' : 'Salvar'} {formTab === 'expense' ? 'Gasto' : formTab === 'income' ? 'Receita' : 'Transferência'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                {!editingTransaction && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveTransaction(false)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl py-3.5 transition-colors text-sm"
+                  >
+                    Salvar e Continuar
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl py-3.5 transition-colors text-sm shadow-md"
+                >
+                  {editingTransaction ? 'Atualizar' : 'Salvar e Fechar'}
+                </button>
+              </div>
             </form>
           </motion.div>
         </motion.div>

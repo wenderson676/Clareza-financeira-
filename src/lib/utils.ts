@@ -48,11 +48,23 @@ export const BUDGET_MODES_INFO = {
     description: '90% Necessidades, 5% Desejos, 5% Reserva/Dívidas',
     explanation: 'Ideal para emergências graves, desemprego ou quando a renda cobre apenas o essencial de sobrevivência. Reduz os gastos supérfluos quase a zero.',
     ratios: { 'Necessidades': 0.90, 'Desejos': 0.05, 'Reserva/Dívidas': 0.05 }
+  },
+  '70-0-30': {
+    name: 'Quitar Dívidas (70/0/30)',
+    description: '70% Necessidades, 0% Desejos, 30% Dívidas',
+    explanation: 'Foco absoluto em eliminar pendências financeiras. Zera gastos supérfluos e direciona 30% do orçamento para amortizar e liquidar suas dívidas.',
+    ratios: { 'Necessidades': 0.70, 'Desejos': 0.0, 'Reserva/Dívidas': 0.30 }
+  },
+  '50-20-30': {
+    name: 'Prosperar (50/20/30)',
+    description: '50% Necessidades, 20% Desejos, 30% Construção de Patrimônio',
+    explanation: 'Para quando a casa já está em ordem. Permite desfrutar de 20% com qualidade de vida enquanto acelera a construção de patrimônio com 30% de aporte.',
+    ratios: { 'Necessidades': 0.50, 'Desejos': 0.20, 'Reserva/Dívidas': 0.30 }
   }
 };
 
-export const getBucketsConfig = (mode: '50-30-20' | '80-10-10' | '90-5-5' = '50-30-20') => {
-  const currentModeInfo = BUDGET_MODES_INFO[mode] || BUDGET_MODES_INFO['50-30-20'];
+export const getBucketsConfig = (mode: string = '50-30-20') => {
+  const currentModeInfo = BUDGET_MODES_INFO[mode as keyof typeof BUDGET_MODES_INFO] || BUDGET_MODES_INFO['50-30-20'];
   return {
     'Necessidades': { percentage: currentModeInfo.ratios['Necessidades'], color: 'bg-blue-500', text: 'text-blue-700' },
     'Desejos': { percentage: currentModeInfo.ratios['Desejos'], color: 'bg-amber-500', text: 'text-amber-700' },

@@ -31,6 +31,9 @@ export default function App() {
     addGoal,
     updateGoal,
     deleteGoal,
+    addDebt,
+    updateDebt,
+    deleteDebt,
     resetStore,
     importState,
     setUserName,
@@ -234,6 +237,8 @@ export default function App() {
                         <option value="50-30-20">Padrão (50/30/20)</option>
                         <option value="80-10-10">Sobrevivência (80/10/10)</option>
                         <option value="90-5-5">Crise (90/5/5)</option>
+                        <option value="70-0-30">Quitar Dívidas (70/0/30)</option>
+                        <option value="50-20-30">Prosperar (50/20/30)</option>
                       </select>
                     </div>
 
@@ -431,6 +436,10 @@ export default function App() {
               addGoal={addGoal} 
               updateGoal={updateGoal} 
               deleteGoal={deleteGoal}
+              debts={state.debts || []}
+              addDebt={addDebt}
+              updateDebt={updateDebt}
+              deleteDebt={deleteDebt}
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
               budgetMode={state.budgetMode || '50-30-20'}
             />

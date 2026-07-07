@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData, Goal, BudgetMode } from '../types';
+import { MonthlyData, Goal, BudgetMode, Debt } from '../types';
+import { DebtsSection } from './DebtsSection';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -15,11 +16,29 @@ interface DashboardProps {
   addGoal?: (goal: Omit<Goal, 'id'>) => void;
   updateGoal?: (id: string, goal: Partial<Goal>) => void;
   deleteGoal?: (id: string) => void;
+  debts?: Debt[];
+  addDebt?: (debt: Omit<Debt, 'id'>) => void;
+  updateDebt?: (id: string, debt: Partial<Debt>) => void;
+  deleteDebt?: (id: string) => void;
   onSaveNote?: (note: string) => void;
   budgetMode?: BudgetMode;
 }
 
-export function Dashboard({ data, previousBalance, allData, goals = [], addGoal, updateGoal, deleteGoal, onSaveNote, budgetMode = '50-30-20' }: DashboardProps) {
+export function Dashboard({ 
+  data, 
+  previousBalance, 
+  allData, 
+  goals = [], 
+  addGoal, 
+  updateGoal, 
+  deleteGoal, 
+  debts = [],
+  addDebt,
+  updateDebt,
+  deleteDebt,
+  onSaveNote, 
+  budgetMode = '50-30-20' 
+}: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -73,6 +92,210 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
     }, 0);
 
   const projectedBalance = previousBalance + projectedIncome - projectedExpenses - projectedNetTransfersToSavings;
+
+  const raioX = useMemo(() => {
+    const savingsRatio = totalIncome > 0 ? (netTransfersToSavings / totalIncome) : 0;
+    const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) : 0;
+    const projectedRatio = totalIncome > 0 ? (projectedBalance / totalIncome) : 0;
+
+    let status = {
+      name: 'Prosperar',
+      color: 'text-indigo-600 bg-indigo-50/70 dark:text-indigo-400 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30',
+      icon: '🚀',
+      desc: 'Sua base está sólida! Foco total em investir, bater metas e expandir seu patrimônio.'
+    };
+
+    if (budgetMode === '70-0-30') {
+      status = {
+        name: 'Quitar Dívidas',
+        color: 'text-rose-600 bg-rose-50/70 dark:text-rose-400 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30',
+        icon: '🎯',
+        desc: 'Modo de Guerra ativado! Seu foco absoluto é liquidar as contas pendentes e retomar o controle da sua vida financeira.'
+      };
+    } else if (budgetMode === '50-20-30') {
+      status = {
+        name: 'Prosperar',
+        color: 'text-indigo-600 bg-indigo-50/70 dark:text-indigo-400 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30',
+        icon: '🚀',
+        desc: 'Sua base está sólida! Foco total em investir, bater metas e expandir seu patrimônio.'
+      };
+    } else if (totalIncome === 0) {
+      status = {
+        name: 'Ajustando',
+        color: 'text-slate-600 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800',
+        icon: '⚙️',
+        desc: 'Aguardando receitas serem registradas para definir o seu diagnóstico.'
+      };
+    } else if (projectedBalance < 0 || expenseRatio > 0.95) {
+      status = {
+        name: 'Crise',
+        color: 'text-rose-600 bg-rose-50/70 dark:text-rose-400 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30',
+        icon: '🚨',
+        desc: 'Seu saldo projetado está negativo ou as despesas consomem toda a receita. Alerta máximo!'
+      };
+    } else if (projectedRatio < 0.1 || savingsRatio <= 0.05) {
+      status = {
+        name: 'Sobrevivência',
+        color: 'text-amber-600 bg-amber-50/70 dark:text-amber-400 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30',
+        icon: '⚠️',
+        desc: 'Você consegue pagar o básico, mas sobra muito pouco e quase não há margem para reserva.'
+      };
+    } else if (savingsRatio > 0.05 && savingsRatio <= 0.15) {
+      status = {
+        name: 'Equilíbrio',
+        color: 'text-sky-600 bg-sky-50/70 dark:text-sky-400 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900/30',
+        icon: '⚖️',
+        desc: 'Você já fecha o mês no azul e está criando uma rotina financeira saudável.'
+      };
+    } else if (savingsRatio > 0.15 && savingsRatio <= 0.25) {
+      status = {
+        name: 'Estável',
+        color: 'text-emerald-600 bg-emerald-50/70 dark:text-emerald-400 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30',
+        icon: '🛡️',
+        desc: 'Orçamento sob controle, reserva crescendo e um excelente nível de segurança.'
+      };
+    }
+
+    let problem = {
+      title: 'Equilíbrio geral',
+      desc: 'Parabéns! Seus limites estão equilibrados e suas despesas seguem o planejamento.',
+      type: 'success'
+    };
+
+    if (budgetMode === '70-0-30') {
+      const totalDebt = debts.reduce((sum, d) => sum + d.totalAmount, 0);
+      problem = {
+        title: 'Foco em Quitação de Dívidas',
+        desc: debts.length > 0 
+          ? `Você tem ${debts.length} dívidas cadastradas que somam ${formatCurrency(totalDebt)}.` 
+          : 'Nenhuma dívida cadastrada ainda. Adicione suas dívidas para gerar o plano de ataque.',
+        type: debts.length > 0 ? 'danger' : 'neutral'
+      };
+    } else if (budgetMode === '50-20-30') {
+      problem = {
+        title: 'Expansão de Patrimônio',
+        desc: 'Seu foco está em acelerar conquistas. Você está direcionando 30% do orçamento para investimento e reserva.',
+        type: 'success'
+      };
+    } else if (totalIncome === 0) {
+      problem = {
+        title: 'Sem receitas cadastradas',
+        desc: 'Registre suas fontes de renda para habilitar a análise e diagnóstico.',
+        type: 'neutral'
+      };
+    } else if (projectedBalance < 0) {
+      problem = {
+        title: 'Contas acima do limite de ganho',
+        desc: `Suas despesas projetadas estão superando suas receitas por ${formatCurrency(Math.abs(projectedBalance))}.`,
+        type: 'danger'
+      };
+    } else {
+      const getBucketExp = (bName: string) => data.transactions
+        .filter(t => t.type === 'expense' && t.bucket === bName && !t.isPending)
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const needsSpent = getBucketExp('Necessidades');
+      const needsAllocated = totalIncome * ((modeBuckets['Necessidades'] as any)?.percentage || 0.5);
+      const desiresSpent = getBucketExp('Desejos');
+      const desiresAllocated = totalIncome * ((modeBuckets['Desejos'] as any)?.percentage || 0.3);
+      const savings = netTransfersToSavings;
+      const savingsAllocated = totalIncome * ((modeBuckets['Reserva/Dívidas'] as any)?.percentage || 0.2);
+
+      if (needsSpent > needsAllocated) {
+        problem = {
+          title: 'Custos Fixos elevados',
+          desc: `As despesas essenciais (${formatCurrency(needsSpent)}) estão sufocando a meta de ${formatCurrency(needsAllocated)}.`,
+          type: 'warning'
+        };
+      } else if (desiresSpent > desiresAllocated) {
+        problem = {
+          title: 'Excesso de gastos livres',
+          desc: `Lazer e Desejos somam ${formatCurrency(desiresSpent)}, estourando o limite sugerido de ${formatCurrency(desiresAllocated)}.`,
+          type: 'warning'
+        };
+      } else if (savings < savingsAllocated) {
+        problem = {
+          title: 'Reserva desabrigada',
+          desc: `Você poupou apenas ${formatCurrency(savings)} do alvo ideal de ${formatCurrency(savingsAllocated)}.`,
+          type: 'warning'
+        };
+      }
+    }
+
+    let action = 'Continue mantendo os registros diários para refinar seu histórico.';
+    if (budgetMode === '70-0-30') {
+      action = debts.length > 0 
+        ? 'Siga o plano de ataque listado abaixo para eliminar primeiro as dívidas de prioridade máxima.' 
+        : 'Clique em "Adicionar Dívida" no painel abaixo para começarmos a traçar seu plano de ação.';
+    } else if (budgetMode === '50-20-30') {
+      action = 'Aproveite o limite de 20% com desejos e lazer de alta qualidade, mantendo o investimento de 30% intocado no início do mês.';
+    } else if (problem.title === 'Sem receitas cadastradas') {
+      action = 'Adicione seu salário ou renda extra para podermos traçar seu plano de ação.';
+    } else if (problem.title === 'Contas acima do limite de ganho') {
+      action = 'Evite novas compras parceladas imediatamente, pause assinaturas supérfluas e reduza em 30% despesas de lazer nesta semana.';
+    } else if (problem.title === 'Custos Fixos elevados') {
+      action = 'Seu custo de vida fixo está pesado. Avalie renegociar planos de internet, seguros ou contas recorrentes para abrir margem.';
+    } else if (problem.title === 'Excesso de gastos livres') {
+      action = 'Estipule uma meta rígida de gastar no máximo R$ 80 com lazer/alimentação fora neste próximo fim de semana.';
+    } else if (problem.title === 'Reserva desabrigada') {
+      action = 'Acostume-se a investir a diferença antes de gastar. Programe uma transferência futura de R$ 30 para a reserva logo hoje.';
+    }
+
+    let forecast = 'Aguardando dados...';
+    if (budgetMode === '70-0-30') {
+      const totalDebt = debts.reduce((sum, d) => sum + d.totalAmount, 0);
+      const plannedAttackAmount = Math.max(totalIncome * 0.3, 300);
+      forecast = debts.length > 0 
+        ? `Seu plano projeta eliminar todas as dívidas em aproximadamente ${Math.ceil(totalDebt / plannedAttackAmount)} meses.` 
+        : 'Aguardando o cadastro das dívidas para simular sua liberação.';
+    } else if (budgetMode === '50-20-30') {
+      forecast = totalIncome > 0 
+        ? `Projeção de acumular ${formatCurrency(totalIncome * 0.3)} em novos investimentos ou reservas só este mês.` 
+        : 'Registre suas entradas para simular o ritmo de crescimento do seu patrimônio.';
+    } else if (totalIncome > 0) {
+      if (projectedBalance < 0) {
+        const daysInMonth = 30;
+        const currentDay = new Date().getDate();
+        const dailySpend = totalExpenses / Math.max(currentDay, 1);
+        if (dailySpend > 0) {
+          const daysLeft = Math.floor(totalIncome / dailySpend);
+          const runOutDay = Math.min(daysLeft, daysInMonth);
+          if (runOutDay < daysInMonth) {
+            forecast = `Mantendo o ritmo atual de gastos, seu saldo projetado zerará por volta do dia ${runOutDay} deste mês.`;
+          } else {
+            forecast = `Você deve fechar o mês no vermelho com um saldo negativo de aproximadamente ${formatCurrency(Math.abs(projectedBalance))}.`;
+          }
+        } else {
+          forecast = `Você deve fechar o mês no vermelho com um saldo negativo de aproximadamente ${formatCurrency(Math.abs(projectedBalance))}.`;
+        }
+      } else if (projectedBalance > 0) {
+        forecast = `Seu orçamento está controlado! Projeção de encerrar o mês com sobra líquida de ${formatCurrency(projectedBalance)}.`;
+      } else {
+        forecast = 'Você deve fechar o mês perfeitamente equilibrado, sem sobras e sem dívidas adicionais.';
+      }
+    } else {
+      forecast = 'Registre suas entradas para que o modelo possa projetar sua saúde no fim do mês.';
+    }
+
+    let mission = 'Registrar cada gasto diário em tempo real para não acumular recibos.';
+    if (budgetMode === '70-0-30') {
+      mission = 'Executar o pagamento mínimo de menor prioridade e amortizar o máximo possível na dívida prioritária.';
+    } else if (budgetMode === '50-20-30') {
+      mission = 'Garantir o aporte de 30% em investimentos logo após o recebimento da receita.';
+    } else if (problem.title === 'Sem receitas cadastradas') {
+      mission = 'Registrar sua primeira entrada de dinheiro no aplicativo.';
+    } else if (problem.title === 'Contas acima do limite de ganho') {
+      mission = 'Passar 5 dias sem fazer uso algum de cartões de crédito e zerar despesas supérfluas.';
+    } else if (problem.title === 'Custos Fixos elevados') {
+      mission = 'Listar suas 3 maiores contas fixas e encontrar um ponto de corte ou redução.';
+    } else if (problem.title === 'Excesso de gastos livres') {
+      mission = 'Substituir duas refeições fora ou deliveries por pratos preparados em casa neste fim de semana.';
+    } else if (problem.title === 'Reserva desabrigada') {
+      mission = 'Alocar pelo menos R$ 15 reais na Reserva Financeira e registrar a transferência no app.';
+    }
+
+    return { status, problem, action, forecast, mission };
+  }, [data.transactions, totalIncome, totalExpenses, netTransfersToSavings, projectedBalance, modeBuckets, budgetMode, debts]);
 
   const getBucketSpent = (bucket: string) => {
     return data.transactions
@@ -144,6 +367,110 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           </div>
         </div>
       </header>
+
+      {/* Raio-X Financeiro */}
+      <motion.div 
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="glass-card p-6 border-emerald-500/10 dark:border-emerald-500/20 bg-gradient-to-b from-white to-emerald-50/5 dark:from-slate-900 dark:to-emerald-950/5 relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full filter blur-2xl pointer-events-none" />
+        
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
+            🔍
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Raio-X Financeiro</h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Diagnóstico automático do seu comportamento de gastos</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          
+          {/* 1. Seu modo atual */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">1. Seu Modo Atual</span>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">{raioX.status.icon}</span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${raioX.status.color}`}>
+                  {raioX.status.name}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {raioX.status.desc}
+              </p>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-800/80 pt-2">
+              Modo Operacional: <span className="font-semibold">{budgetMode === '50-30-20' ? '50/30/20 (Padrão)' : budgetMode === '80-10-10' ? '80/10/10 (Sobrevivência)' : '90/5/5 (Crise)'}</span>
+            </div>
+          </div>
+
+          {/* 2. Maior problema hoje */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">2. Maior Problema Hoje</span>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-lg">
+                  {raioX.problem.type === 'danger' ? '🚨' : raioX.problem.type === 'warning' ? '⚠️' : raioX.problem.type === 'success' ? '✨' : 'ℹ️'}
+                </span>
+                <span className={`text-xs font-bold ${
+                  raioX.problem.type === 'danger' ? 'text-rose-600 dark:text-rose-400' :
+                  raioX.problem.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                  raioX.problem.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
+                  'text-slate-600 dark:text-slate-400'
+                }`}>
+                  {raioX.problem.title}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {raioX.problem.desc}
+              </p>
+            </div>
+          </div>
+
+          {/* 3. O que fazer agora */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">3. O que Fazer Agora</span>
+              <div className="flex items-start gap-2">
+                <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                  {raioX.action}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Previsão do mês */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between md:col-span-2 lg:col-span-1">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">4. Previsão do Mês</span>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                {raioX.forecast}
+              </p>
+            </div>
+          </div>
+
+          {/* 5. Missão da semana */}
+          <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 flex flex-col justify-between md:col-span-2 lg:col-span-2">
+            <div>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-2">5. Missão da Semana</span>
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 text-xs font-bold">
+                  ✓
+                </div>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {raioX.mission}
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </motion.div>
 
       <div className="glass-card p-6">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
@@ -314,6 +641,15 @@ export function Dashboard({ data, previousBalance, allData, goals = [], addGoal,
           );
         })}
       </div>
+
+      {(budgetMode === '70-0-30' || debts.length > 0) && (
+        <DebtsSection 
+          debts={debts} 
+          addDebt={addDebt!} 
+          deleteDebt={deleteDebt!} 
+          totalIncome={totalIncome}
+        />
+      )}
 
       <div className="glass-card p-6">
         <div className="flex justify-between items-center mb-6">
