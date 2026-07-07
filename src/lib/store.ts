@@ -8,7 +8,8 @@ const defaultState: AppState = {
   monthlyData: {},
   goals: [],
   assets: [],
-  debts: []
+  debts: [],
+  dashboardCardOrder: []
 };
 
 export function useStore() {
@@ -246,7 +247,8 @@ export function useStore() {
       },
       goals: [],
       assets: [],
-      debts: []
+      debts: [],
+      dashboardCardOrder: []
     });
   };
 
@@ -265,6 +267,13 @@ export function useStore() {
     setState(prev => ({
       ...prev,
       budgetMode: mode
+    }));
+  };
+
+  const setCardOrder = (order: string[]) => {
+    setState(prev => ({
+      ...prev,
+      dashboardCardOrder: order
     }));
   };
 
@@ -290,6 +299,7 @@ export function useStore() {
     resetStore,
     importState,
     setUserName,
-    setBudgetMode
+    setBudgetMode,
+    setCardOrder
   };
 }

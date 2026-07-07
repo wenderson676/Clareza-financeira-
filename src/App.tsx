@@ -37,7 +37,8 @@ export default function App() {
     resetStore,
     importState,
     setUserName,
-    setBudgetMode
+    setBudgetMode,
+    setCardOrder
   } = useStore();
 
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
@@ -442,6 +443,8 @@ export default function App() {
               deleteDebt={deleteDebt}
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
               budgetMode={state.budgetMode || '50-30-20'}
+              dashboardCardOrder={state.dashboardCardOrder || []}
+              setCardOrder={setCardOrder}
             />
           )}
           {currentTab === 'transactions' && (

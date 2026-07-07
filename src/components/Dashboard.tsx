@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb } from 'lucide-react';
+import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData, Goal, BudgetMode, Debt } from '../types';
 import { DebtsSection } from './DebtsSection';
@@ -22,6 +22,8 @@ interface DashboardProps {
   deleteDebt?: (id: string) => void;
   onSaveNote?: (note: string) => void;
   budgetMode?: BudgetMode;
+  dashboardCardOrder?: string[];
+  setCardOrder?: (order: string[]) => void;
 }
 
 export function Dashboard({ 
@@ -37,7 +39,9 @@ export function Dashboard({
   updateDebt,
   deleteDebt,
   onSaveNote, 
-  budgetMode = '50-30-20' 
+  budgetMode = '50-30-20',
+  dashboardCardOrder = [],
+  setCardOrder
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
@@ -344,6 +348,569 @@ export function Dashboard({
     return result;
   }, [allData, data.monthId]);
 
+  const [isOrganizerOpen, setIsOrganizerOpen] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const DEFAULT_CARD_ORDER = [
+    'raioX',
+    'analiseMensal',
+    'contasAPagar',
+    'distribuicao',
+    'envelopes',
+    'dividas',
+    'cofrinho',
+    'evolucao',
+    'reflexao',
+    'sabedoria'
+  ];
+
+  const CARD_LABELS: Record<string, { label: string; icon: string }> = {
+    raioX: { label: 'Raio-X Financeiro', icon: '🔍' },
+    analiseMensal: { label: 'Análise Mensal', icon: '📊' },
+    contasAPagar: { label: 'Contas a Pagar', icon: '📅' },
+    distribuicao: { label: 'Distribuição de Gastos', icon: '🍕' },
+    envelopes: { label: 'Progresso dos Envelopes', icon: '✉️' },
+    dividas: { label: 'Painel de Dívidas', icon: '🎯' },
+    cofrinho: { label: 'Cofrinho (Metas e Sonhos)', icon: '🐷' },
+    evolucao: { label: 'Evolução (Últimos 6 Meses)', icon: '📈' },
+    reflexao: { label: 'Reflexão do Mês', icon: '💡' },
+    sabedoria: { label: 'Sabedoria Financeira', icon: '📖' }
+  };
+
+  const activeCardOrder = useMemo(() => {
+    const userOrder = dashboardCardOrder || [];
+    const filteredUserOrder = userOrder.filter(k => DEFAULT_CARD_ORDER.includes(k));
+    const missingCards = DEFAULT_CARD_ORDER.filter(k => !filteredUserOrder.includes(k));
+    return [...filteredUserOrder, ...missingCards];
+  }, [dashboardCardOrder]);
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const newOrder = [...activeCardOrder];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    
+    const temp = newOrder[index];
+    newOrder[index] = newOrder[targetIndex];
+    newOrder[targetIndex] = temp;
+    
+    if (setCardOrder) {
+      setCardOrder(newOrder);
+    }
+  };
+
+  const handleResetOrder = () => {
+    if (setCardOrder) {
+      setCardOrder(DEFAULT_CARD_ORDER);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newOrder = [...activeCardOrder];
+    const draggedItem = newOrder[draggedIndex];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(index, 0, draggedItem);
+    
+    setDraggedIndex(index);
+    if (setCardOrder) {
+      setCardOrder(newOrder);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const renderRaioX = () => (
+    <motion.div 
+      key="raioX"
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="glass-card p-6 border-emerald-500/10 dark:border-emerald-500/20 bg-gradient-to-b from-white to-emerald-50/5 dark:from-slate-900 dark:to-emerald-950/5 relative overflow-hidden animate-fade-in"
+    >
+      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full filter blur-2xl pointer-events-none" />
+      
+      <div className="flex items-center gap-2 mb-5">
+        <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
+          🔍
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Raio-X Financeiro</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Diagnóstico automático do seu comportamento de gastos</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        {/* 1. Seu modo atual */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">1. Seu Modo Atual</span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">{raioX.status.icon}</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${raioX.status.color}`}>
+                {raioX.status.name}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {raioX.status.desc}
+            </p>
+          </div>
+          <div className="text-[10px] text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-800/80 pt-2">
+            Modo Operacional: <span className="font-semibold">{budgetMode === '50-30-20' ? '50/30/20 (Padrão)' : budgetMode === '80-10-10' ? '80/10/10 (Sobrevivência)' : '90/5/5 (Crise)'}</span>
+          </div>
+        </div>
+
+        {/* 2. Maior problema hoje */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">2. Maior Problema Hoje</span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-lg">
+                {raioX.problem.type === 'danger' ? '🚨' : raioX.problem.type === 'warning' ? '⚠️' : raioX.problem.type === 'success' ? '✨' : 'ℹ️'}
+              </span>
+              <span className={`text-xs font-bold ${
+                raioX.problem.type === 'danger' ? 'text-rose-600 dark:text-rose-400' :
+                raioX.problem.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
+                raioX.problem.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
+                'text-slate-600 dark:text-slate-400'
+              }`}>
+                {raioX.problem.title}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {raioX.problem.desc}
+            </p>
+          </div>
+        </div>
+
+        {/* 3. O que fazer agora */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">3. O que Fazer Agora</span>
+            <div className="flex items-start gap-2">
+              <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                {raioX.action}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Previsão do mês */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between md:col-span-2 lg:col-span-1">
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">4. Previsão do Mês</span>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {raioX.forecast}
+            </p>
+          </div>
+        </div>
+
+        {/* 5. Missão da semana */}
+        <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 flex flex-col justify-between md:col-span-2 lg:col-span-2">
+          <div>
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-2">5. Missão da Semana</span>
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 text-xs font-bold">
+                ✓
+              </div>
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {raioX.mission}
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </motion.div>
+  );
+
+  const renderAnaliseMensal = () => (
+    <div key="analiseMensal" className="glass-card p-6 animate-fade-in">
+      <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Saldo</div>
+          <div className="font-bold text-slate-800 dark:text-slate-200 text-sm sm:text-base">{formatCurrency(projectedBalance)}</div>
+        </div>
+        <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Gastos</div>
+          <div className="font-bold text-rose-600 dark:text-rose-400 text-sm sm:text-base">{formatCurrency(projectedExpenses)}</div>
+        </div>
+        <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Balanço Final</div>
+          <div className={`font-bold text-sm sm:text-base ${projectedBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {projectedBalance >= 0 ? '+' : ''}{formatCurrency(projectedBalance)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderContasAPagar = () => {
+    if (pendingBills.length === 0) return null;
+    return (
+      <div key="contasAPagar" className="glass-card p-6 animate-fade-in">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Calendar size={18} className="text-rose-500" />
+            Contas a Pagar ({pendingBills.length})
+          </h2>
+        </div>
+        <div className="space-y-3">
+          {pendingBills.slice(0, 3).map(bill => (
+            <div key={bill.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100/50 dark:border-slate-700/50">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{bill.description}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Vence dia {format(new Date(bill.date + 'T00:00:00'), 'dd/MM')}</span>
+              </div>
+              <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
+                {formatCurrency(bill.amount)}
+              </span>
+            </div>
+          ))}
+          {pendingBills.length > 3 && (
+            <div className="text-center pt-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400">E mais {pendingBills.length - 3} {pendingBills.length - 3 === 1 ? 'conta' : 'contas'}...</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDistribuicao = () => {
+    const CHART_COLORS: Record<string, string> = {
+      'Necessidades': '#3b82f6', // blue-500
+      'Desejos': '#f59e0b', // amber-500
+      'Reserva/Dívidas': '#10b981' // emerald-500
+    };
+    
+    const pieData = Object.keys(modeBuckets).map((name) => {
+      let spent = 0;
+      if (name === 'Reserva/Dívidas') {
+        spent = netTransfersToSavings;
+      } else {
+        spent = getBucketSpent(name);
+      }
+      return {
+        name,
+        value: spent > 0 ? spent : 0,
+        fill: CHART_COLORS[name] || '#ccc'
+      };
+    }).filter(item => item.value > 0);
+
+    return (
+      <div key="distribuicao" className="glass-card p-6 animate-fade-in">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Distribuição de Gastos</h2>
+        
+        {pieData.length === 0 ? (
+          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
+            Nenhum dado para exibir ainda.
+          </div>
+        ) : (
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <RechartsTooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderEnvelopes = () => (
+    <div key="envelopes" className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+      {Object.entries(modeBuckets).map(([name, conf]) => {
+        const config = conf as { percentage: number; color: string; text: string };
+        const allocated = totalIncome * config.percentage;
+        
+        let spent = 0;
+        let remaining = 0;
+        let percentSpent = 0;
+        let spentLabel = 'Gasto';
+        
+        if (name === 'Reserva/Dívidas') {
+          spent = netTransfersToSavings;
+          remaining = allocated - spent;
+          percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
+          spentLabel = 'Guardado';
+        } else {
+          spent = getBucketSpent(name);
+          remaining = allocated - spent;
+          percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
+        }
+        
+        return (
+          <div key={name} className="glass-card p-6 relative">
+            <button 
+              onClick={() => setActiveInfo(name)}
+              className="absolute top-4 right-4 text-slate-300 hover:text-emerald-500 dark:text-slate-600 dark:hover:text-emerald-400 transition-colors"
+              aria-label={`Informações sobre ${name}`}
+            >
+              <HelpCircle size={18} />
+            </button>
+            
+            <div className="flex justify-between items-center mb-3 pr-8">
+              <h3 className={`font-semibold ${config.text} dark:text-opacity-90 flex items-center gap-2`}>
+                <div className={`w-3 h-3 rounded-full ${config.color}`}></div>
+                {name}
+                <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({config.percentage * 100}%)</span>
+              </h3>
+            </div>
+            
+            <div className="mb-2">
+              <span className="text-xl font-bold text-slate-700 dark:text-slate-200">{formatCurrency(allocated)}</span>
+            </div>
+            
+            <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden mb-3">
+              <div 
+                className={`h-full ${config.color} transition-all duration-500`}
+                style={{ width: `${Math.min(percentSpent, 100)}%` }}
+              ></div>
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500 dark:text-slate-400">{spentLabel}: {formatCurrency(spent)}</span>
+              <span className={`font-medium ${remaining < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                Resta: {formatCurrency(remaining)}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderDividas = () => {
+    if (budgetMode !== '70-0-30' && debts.length === 0) return null;
+    return (
+      <div key="dividas" className="animate-fade-in">
+        <DebtsSection 
+          debts={debts} 
+          addDebt={addDebt!} 
+          deleteDebt={deleteDebt!} 
+          totalIncome={totalIncome}
+        />
+      </div>
+    );
+  };
+
+  const renderCofrinho = () => (
+    <div key="cofrinho" className="glass-card p-6 animate-fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <Target size={18} className="text-indigo-500" />
+          Resumo do Cofrinho (Metas e Sonhos)
+        </h2>
+        <button 
+          onClick={() => {
+            setGoalForm({ title: '', targetAmount: '', currentAmount: '' });
+            setEditingGoal(null);
+            setShowGoalForm(true);
+          }}
+          className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+        >
+          <Plus size={14} /> Nova Meta
+        </button>
+      </div>
+      
+      <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
+        <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mb-1 font-medium">Total Guardado (Cofrinho Geral)</p>
+        <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
+          {formatCurrency(
+            Object.values(allData).reduce((sum, month) => {
+              return sum + month.transactions.reduce((mSum, t) => {
+                if (t.isPending) return mSum;
+                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return mSum + t.amount;
+                if (t.type === 'transfer_from_savings') return mSum - t.amount;
+                return mSum;
+              }, 0);
+            }, 0)
+          )}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {goals.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhuma meta criada ainda. O que você deseja conquistar?</p>
+          </div>
+        ) : (
+          goals.map(goal => {
+            const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
+            return (
+              <div key={goal.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 group">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-200">{goal.title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {formatCurrency(goal.currentAmount)} de {formatCurrency(goal.targetAmount)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => {
+                        setGoalForm({ 
+                          title: goal.title, 
+                          targetAmount: goal.targetAmount.toString(), 
+                          currentAmount: goal.currentAmount.toString() 
+                        });
+                        setEditingGoal(goal);
+                        setShowGoalForm(true);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button 
+                      onClick={() => deleteGoal?.(goal.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+                    >
+                      <Trash size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-3">
+                  <div 
+                    className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                    style={{ width: `${percent}%` }}
+                  ></div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  const renderEvolucao = () => (
+    <div key="evolucao" className="glass-card p-6 animate-fade-in">
+      <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Evolução (Últimos 6 meses)</h2>
+      <div className="h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={historyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `R$${val/1000}k`} />
+            <RechartsTooltip 
+              cursor={{ fill: 'rgba(0,0,0,0.05)' }}
+              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: 'var(--tw-colors-white, #fff)' }}
+              formatter={(value: number) => formatCurrency(value)}
+            />
+            <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+            <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
+            <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={30} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const renderReflexao = () => (
+    <div key="reflexao" className="glass-card p-6 animate-fade-in">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+          <Lightbulb size={22} className="animate-pulse" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Reflexão do Mês</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Avaliação do seu progresso financeiro</p>
+        </div>
+      </div>
+
+      <div className="bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl p-4 mb-4 border border-emerald-100/30 dark:border-emerald-500/10">
+        <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed italic">
+          "Como você avalia suas escolhas financeiras este mês? Onde você poderia ter administrado melhor os seus recursos?"
+        </p>
+      </div>
+
+      {isEditingNote ? (
+        <div className="space-y-3">
+          <textarea
+            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 dark:focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500 rounded-2xl p-3 text-sm text-slate-700 dark:text-slate-200 outline-none h-28 transition-all resize-none"
+            placeholder="Escreva aqui as lições aprendidas, conquistas ou pontos de melhoria neste mês..."
+            value={note}
+            onChange={e => setNote(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setNote(data.devotionalNote || '');
+                setIsEditingNote(false);
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                if (onSaveNote) {
+                  onSaveNote(note);
+                }
+                setIsEditingNote(false);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
+            >
+              Salvar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl p-4 min-h-[70px] cursor-pointer border border-transparent hover:border-emerald-100 dark:hover:border-emerald-500/10 transition-all flex flex-col justify-center"
+          onClick={() => setIsEditingNote(true)}
+        >
+          {note ? (
+            <p className="text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{note}</p>
+          ) : (
+            <div className="text-center py-2">
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic block">Nenhuma reflexão salva ainda. Clique aqui para escrever suas anotações...</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSabedoria = () => (
+    <div key="sabedoria" className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-950 text-slate-100 p-8 rounded-3xl relative overflow-hidden shadow-xl shadow-slate-900/20 dark:shadow-black/40 border border-slate-700/50 animate-fade-in">
+      <div className="absolute -top-6 -right-6 p-4 opacity-5 transform rotate-12 scale-150">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3">Sabedoria Financeira</h3>
+      <p className="font-serif italic text-lg leading-relaxed text-slate-200 dark:text-slate-300">{quote}</p>
+    </div>
+  );
+
   return (
     <div className="space-y-6 pb-24">
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
@@ -368,469 +935,41 @@ export function Dashboard({
         </div>
       </header>
 
-      {/* Raio-X Financeiro */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="glass-card p-6 border-emerald-500/10 dark:border-emerald-500/20 bg-gradient-to-b from-white to-emerald-50/5 dark:from-slate-900 dark:to-emerald-950/5 relative overflow-hidden"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full filter blur-2xl pointer-events-none" />
-        
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
-            🔍
+      {/* Barra de Ações para Reordenação */}
+      <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/60 dark:border-slate-800/80 transition-colors">
+        <div className="flex items-center gap-3 text-left">
+          <div className="w-9 h-9 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <SlidersHorizontal size={16} />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Raio-X Financeiro</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Diagnóstico automático do seu comportamento de gastos</p>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block leading-tight">Organizar Painel</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">Mude a ordem dos cartões da forma que desejar</span>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          
-          {/* 1. Seu modo atual */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">1. Seu Modo Atual</span>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">{raioX.status.icon}</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${raioX.status.color}`}>
-                  {raioX.status.name}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                {raioX.status.desc}
-              </p>
-            </div>
-            <div className="text-[10px] text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-800/80 pt-2">
-              Modo Operacional: <span className="font-semibold">{budgetMode === '50-30-20' ? '50/30/20 (Padrão)' : budgetMode === '80-10-10' ? '80/10/10 (Sobrevivência)' : '90/5/5 (Crise)'}</span>
-            </div>
-          </div>
-
-          {/* 2. Maior problema hoje */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">2. Maior Problema Hoje</span>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-lg">
-                  {raioX.problem.type === 'danger' ? '🚨' : raioX.problem.type === 'warning' ? '⚠️' : raioX.problem.type === 'success' ? '✨' : 'ℹ️'}
-                </span>
-                <span className={`text-xs font-bold ${
-                  raioX.problem.type === 'danger' ? 'text-rose-600 dark:text-rose-400' :
-                  raioX.problem.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                  raioX.problem.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                  'text-slate-600 dark:text-slate-400'
-                }`}>
-                  {raioX.problem.title}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                {raioX.problem.desc}
-              </p>
-            </div>
-          </div>
-
-          {/* 3. O que fazer agora */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">3. O que Fazer Agora</span>
-              <div className="flex items-start gap-2">
-                <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                  {raioX.action}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Previsão do mês */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between md:col-span-2 lg:col-span-1">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">4. Previsão do Mês</span>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {raioX.forecast}
-              </p>
-            </div>
-          </div>
-
-          {/* 5. Missão da semana */}
-          <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 flex flex-col justify-between md:col-span-2 lg:col-span-2">
-            <div>
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-2">5. Missão da Semana</span>
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 text-xs font-bold">
-                  ✓
-                </div>
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  {raioX.mission}
-                </p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </motion.div>
-
-      <div className="glass-card p-6">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Saldo</div>
-            <div className="font-bold text-slate-800 dark:text-slate-200 text-sm sm:text-base">{formatCurrency(projectedBalance)}</div>
-          </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Gastos</div>
-            <div className="font-bold text-rose-600 dark:text-rose-400 text-sm sm:text-base">{formatCurrency(projectedExpenses)}</div>
-          </div>
-          <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Balanço Final</div>
-            <div className={`font-bold text-sm sm:text-base ${projectedBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-              {projectedBalance >= 0 ? '+' : ''}{formatCurrency(projectedBalance)}
-            </div>
-          </div>
-        </div>
+        <button
+          onClick={() => setIsOrganizerOpen(true)}
+          className="flex items-center gap-2 text-xs font-bold bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/50 dark:border-slate-800 hover:border-emerald-500 hover:bg-white dark:hover:bg-slate-900 hover:text-emerald-600 dark:hover:text-emerald-400 py-2.5 px-4 rounded-2xl transition-all shadow-sm cursor-pointer"
+        >
+          Personalizar Layout
+        </button>
       </div>
 
-      {pendingBills.length > 0 && (
-        <div className="glass-card p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <Calendar size={18} className="text-rose-500" />
-              Contas a Pagar ({pendingBills.length})
-            </h2>
-          </div>
-          <div className="space-y-3">
-            {pendingBills.slice(0, 3).map(bill => (
-              <div key={bill.id} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100/50 dark:border-slate-700/50">
-                <div className="flex flex-col">
-                  <span className="font-medium text-sm text-slate-800 dark:text-slate-200">{bill.description}</span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">Vence dia {format(new Date(bill.date + 'T00:00:00'), 'dd/MM')}</span>
-                </div>
-                <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
-                  {formatCurrency(bill.amount)}
-                </span>
-              </div>
-            ))}
-            {pendingBills.length > 3 && (
-              <div className="text-center pt-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">E mais {pendingBills.length - 3} {pendingBills.length - 3 === 1 ? 'conta' : 'contas'}...</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="glass-card p-6">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Distribuição de Gastos</h2>
-        
-        {(() => {
-          const CHART_COLORS: Record<string, string> = {
-            'Necessidades': '#3b82f6', // blue-500
-            'Desejos': '#f59e0b', // amber-500
-            'Reserva/Dívidas': '#10b981' // emerald-500
-          };
-          
-          const pieData = Object.keys(modeBuckets).map((name) => {
-            let spent = 0;
-            if (name === 'Reserva/Dívidas') {
-              spent = netTransfersToSavings;
-            } else {
-              spent = getBucketSpent(name);
-            }
-            return {
-              name,
-              value: spent > 0 ? spent : 0,
-              fill: CHART_COLORS[name] || '#ccc'
-            };
-          }).filter(item => item.value > 0);
-
-          if (pieData.length === 0) {
-            return (
-              <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
-                Nenhum dado para exibir ainda.
-              </div>
-            );
-          }
-
-          return (
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          );
-        })()}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.entries(modeBuckets).map(([name, conf]) => {
-          const config = conf as { percentage: number; color: string; text: string };
-          const allocated = totalIncome * config.percentage;
-          
-          let spent = 0;
-          let remaining = 0;
-          let percentSpent = 0;
-          let spentLabel = 'Gasto';
-          
-          if (name === 'Reserva/Dívidas') {
-            spent = netTransfersToSavings;
-            remaining = allocated - spent;
-            percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
-            spentLabel = 'Guardado';
-          } else {
-            spent = getBucketSpent(name);
-            remaining = allocated - spent;
-            percentSpent = allocated > 0 ? (spent / allocated) * 100 : 0;
-          }
-          
-          return (
-            <div key={name} className="glass-card p-6 relative">
-              <button 
-                onClick={() => setActiveInfo(name)}
-                className="absolute top-4 right-4 text-slate-300 hover:text-emerald-500 dark:text-slate-600 dark:hover:text-emerald-400 transition-colors"
-                aria-label={`Informações sobre ${name}`}
-              >
-                <HelpCircle size={18} />
-              </button>
-              
-              <div className="flex justify-between items-center mb-3 pr-8">
-                <h3 className={`font-semibold ${config.text} dark:text-opacity-90 flex items-center gap-2`}>
-                  <div className={`w-3 h-3 rounded-full ${config.color}`}></div>
-                  {name}
-                  <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({config.percentage * 100}%)</span>
-                </h3>
-              </div>
-              
-              <div className="mb-2">
-                <span className="text-xl font-bold text-slate-700 dark:text-slate-200">{formatCurrency(allocated)}</span>
-              </div>
-              
-              <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden mb-3">
-                <div 
-                  className={`h-full ${config.color} transition-all duration-500`}
-                  style={{ width: `${Math.min(percentSpent, 100)}%` }}
-                ></div>
-              </div>
-              
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500 dark:text-slate-400">{spentLabel}: {formatCurrency(spent)}</span>
-                <span className={`font-medium ${remaining < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                  Resta: {formatCurrency(remaining)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {(budgetMode === '70-0-30' || debts.length > 0) && (
-        <DebtsSection 
-          debts={debts} 
-          addDebt={addDebt!} 
-          deleteDebt={deleteDebt!} 
-          totalIncome={totalIncome}
-        />
-      )}
-
-      <div className="glass-card p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <Target size={18} className="text-indigo-500" />
-            Resumo do Cofrinho (Metas e Sonhos)
-          </h2>
-          <button 
-            onClick={() => {
-              setGoalForm({ title: '', targetAmount: '', currentAmount: '' });
-              setEditingGoal(null);
-              setShowGoalForm(true);
-            }}
-            className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
-          >
-            <Plus size={14} /> Nova Meta
-          </button>
-        </div>
-        
-        <div className="mb-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/50">
-          <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mb-1 font-medium">Total Guardado (Cofrinho Geral)</p>
-          <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-            {formatCurrency(
-              Object.values(allData).reduce((sum, month) => {
-                return sum + month.transactions.reduce((mSum, t) => {
-                  if (t.isPending) return mSum;
-                  if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return mSum + t.amount;
-                  if (t.type === 'transfer_from_savings') return mSum - t.amount;
-                  return mSum;
-                }, 0);
-              }, 0)
-            )}
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {goals.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Nenhuma meta criada ainda. O que você deseja conquistar?</p>
-            </div>
-          ) : (
-            goals.map(goal => {
-              const percent = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-              return (
-                <div key={goal.id} className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 group">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-semibold text-slate-800 dark:text-slate-200">{goal.title}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        {formatCurrency(goal.currentAmount)} de {formatCurrency(goal.targetAmount)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => {
-                          setGoalForm({ 
-                            title: goal.title, 
-                            targetAmount: goal.targetAmount.toString(), 
-                            currentAmount: goal.currentAmount.toString() 
-                          });
-                          setEditingGoal(goal);
-                          setShowGoalForm(true);
-                        }}
-                        className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button 
-                        onClick={() => deleteGoal?.(goal.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
-                      >
-                        <Trash size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-3">
-                    <div 
-                      className={`h-full transition-all duration-500 ${percent >= 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                      style={{ width: `${percent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <div className="glass-card p-6">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Evolução (Últimos 6 meses)</h2>
-        <div className="h-56 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={historyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" strokeOpacity={0.5} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `R$${val/1000}k`} />
-              <RechartsTooltip 
-                cursor={{ fill: 'rgba(0,0,0,0.05)' }}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: 'var(--tw-colors-white, #fff)' }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-              <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
-              <Bar dataKey="Despesas" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={30} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Reflexão Financeira Card */}
-      <div className="glass-card p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-            <Lightbulb size={22} className="animate-pulse" />
-          </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">Reflexão do Mês</h2>
-            <p className="text-xs text-slate-400 dark:text-slate-500">Avaliação do seu progresso financeiro</p>
-          </div>
-        </div>
-
-        <div className="bg-emerald-50/50 dark:bg-emerald-500/5 rounded-2xl p-4 mb-4 border border-emerald-100/30 dark:border-emerald-500/10">
-          <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed italic">
-            "Como você avalia suas escolhas financeiras este mês? Onde você poderia ter administrado melhor os seus recursos?"
-          </p>
-        </div>
-
-        {isEditingNote ? (
-          <div className="space-y-3">
-            <textarea
-              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 dark:focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500 rounded-2xl p-3 text-sm text-slate-700 dark:text-slate-200 outline-none h-28 transition-all resize-none"
-              placeholder="Escreva aqui as lições aprendidas, conquistas ou pontos de melhoria neste mês..."
-              value={note}
-              onChange={e => setNote(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setNote(data.devotionalNote || '');
-                  setIsEditingNote(false);
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  if (onSaveNote) {
-                    onSaveNote(note);
-                  }
-                  setIsEditingNote(false);
-                }}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div 
-            className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl p-4 min-h-[70px] cursor-pointer border border-transparent hover:border-emerald-100 dark:hover:border-emerald-500/10 transition-all flex flex-col justify-center"
-            onClick={() => setIsEditingNote(true)}
-          >
-            {note ? (
-              <p className="text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{note}</p>
-            ) : (
-              <div className="text-center py-2">
-                <span className="text-xs text-slate-400 dark:text-slate-500 italic block">Nenhuma reflexão salva ainda. Clique aqui para escrever suas anotações...</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-950 text-slate-100 p-8 rounded-3xl relative overflow-hidden shadow-xl shadow-slate-900/20 dark:shadow-black/40 border border-slate-700/50">
-        <div className="absolute -top-6 -right-6 p-4 opacity-5 transform rotate-12 scale-150">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <h3 className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-3">Sabedoria Financeira</h3>
-        <p className="font-serif italic text-lg leading-relaxed text-slate-200 dark:text-slate-300">{quote}</p>
-      </div>
+      {/* Cartões Dinâmicos Ordenados */}
+      {activeCardOrder.map((key) => {
+        switch (key) {
+          case 'raioX': return renderRaioX();
+          case 'analiseMensal': return renderAnaliseMensal();
+          case 'contasAPagar': return renderContasAPagar();
+          case 'distribuicao': return renderDistribuicao();
+          case 'envelopes': return renderEnvelopes();
+          case 'dividas': return renderDividas();
+          case 'cofrinho': return renderCofrinho();
+          case 'evolucao': return renderEvolucao();
+          case 'reflexao': return renderReflexao();
+          case 'sabedoria': return renderSabedoria();
+          default: return null;
+        }
+      })}
 
       <AnimatePresence>
         {activeInfo && (
@@ -868,6 +1007,95 @@ export function Dashboard({
                   className="w-full mt-6 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-medium rounded-xl py-3 transition-colors"
                 >
                   Entendi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isOrganizerOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setIsOrganizerOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[85vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-10">
+                <div className="text-left">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <SlidersHorizontal className="text-emerald-500" size={20} />
+                    Organizar Painel
+                  </h3>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Reordene os blocos usando as setas ou arrastando</p>
+                </div>
+                <button onClick={() => setIsOrganizerOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-3 flex-1">
+                {activeCardOrder.map((key, index) => {
+                  const card = CARD_LABELS[key];
+                  if (!card) return null;
+                  return (
+                    <div
+                      key={key}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={(e) => handleDragOver(e, index)}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100/70 dark:hover:bg-slate-800/80 border border-slate-200/50 dark:border-slate-800 rounded-2xl transition-all cursor-grab active:cursor-grabbing group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-slate-400 dark:text-slate-600 cursor-grab active:cursor-grabbing">
+                          <GripVertical size={16} />
+                        </div>
+                        <span className="text-lg">{card.icon}</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{card.label}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 opacity-100 sm:opacity-50 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          disabled={index === 0}
+                          onClick={() => handleMove(index, 'up')}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
+                        >
+                          <ArrowUp size={15} />
+                        </button>
+                        <button
+                          disabled={index === activeCardOrder.length - 1}
+                          onClick={() => handleMove(index, 'down')}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
+                        >
+                          <ArrowDown size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+                <button
+                  onClick={handleResetOrder}
+                  className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw size={14} />
+                  Restaurar Padrão
+                </button>
+                <button
+                  onClick={() => setIsOrganizerOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
+                >
+                  Confirmar Layout
                 </button>
               </div>
             </motion.div>

@@ -52,4 +52,5 @@ export interface AppState {
   userName?: string;
   budgetMode?: BudgetMode;
   debts?: Debt[];
+  dashboardCardOrder?: string[];
 }
