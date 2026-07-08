@@ -423,6 +423,21 @@ export function useStore() {
     }));
   };
 
+  const addCustomCategory = (type: 'expense' | 'income' | 'transfer', category: string) => {
+    setState(prev => {
+      const currentCats = prev.customCategories || {};
+      const list = currentCats[type] || [];
+      if (list.includes(category)) return prev;
+      return {
+        ...prev,
+        customCategories: {
+          ...currentCats,
+          [type]: [...list, category]
+        }
+      };
+    });
+  };
+
   return {
     state,
     getCurrentMonthId,
@@ -450,6 +465,7 @@ export function useStore() {
     importState,
     setUserName,
     setBudgetMode,
-    setCardOrder
+    setCardOrder,
+    addCustomCategory
   };
 }

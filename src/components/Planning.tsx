@@ -1,374 +1,614 @@
-import React, { useMemo } from 'react';
-import { MonthlyData, BudgetMode } from '../types';
-import { getBucketsConfig, formatCurrency } from '../lib/utils';
-import { Target, TrendingUp, AlertTriangle, CheckCircle2, Compass, Activity, ArrowRight, BrainCircuit, BarChart4 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { MonthlyData, BudgetMode, Debt, Goal, Account } from '../types';
+import { generateFinancialDiagnosis, answerFinancialQuery, FinancialMode, RiskLevel } from '../lib/financialEngine';
+import { 
+  Target, 
+  TrendingUp, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Compass, 
+  Activity, 
+  ArrowRight, 
+  BrainCircuit, 
+  ShieldAlert, 
+  Zap, 
+  Lightbulb, 
+  Clock, 
+  Info, 
+  FileText, 
+  Save, 
+  MessageSquare, 
+  Send, 
+  TrendingDown, 
+  DollarSign, 
+  User, 
+  Calculator, 
+  CheckSquare, 
+  HelpCircle,
+  RefreshCw,
+  X
+} from 'lucide-react';
 
 interface PlanningProps {
   data: MonthlyData;
+  allData: Record<string, MonthlyData>;
   previousBalance: number;
   budgetMode?: BudgetMode;
+  debts: Debt[];
+  goals: Goal[];
+  accounts: Account[];
+  onSaveNote?: (note: string) => void;
 }
 
-interface StrategyItem {
-  id: string;
-  type: 'danger' | 'warning' | 'success' | 'info';
-  title: string;
-  description: string;
-  actionable: string;
-}
+export function Planning({ 
+  data, 
+  allData, 
+  previousBalance, 
+  budgetMode = '50-30-20', 
+  debts, 
+  goals, 
+  accounts,
+  onSaveNote 
+}: PlanningProps) {
+  
+  const [selectedMetricHelp, setSelectedMetricHelp] = useState<string | null>(null);
 
-export function Planning({ data, previousBalance, budgetMode = '50-30-20' }: PlanningProps) {
-  const txs = data.transactions;
-  const modeBuckets = useMemo(() => getBucketsConfig(budgetMode) as Record<string, { percentage: number; color: string; text: string }>, [budgetMode]);
-
-  // Calculando valores realizados e pendentes
-  const realizedIncome = txs.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const realizedSavingsWithdraw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const netRealizedSavings = realizedSavings - realizedSavingsWithdraw;
-
-  const pendingIncome = txs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const pendingSavingsWithdraw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
-
-  const currentBalance = previousBalance + realizedIncome - realizedExpenses - netRealizedSavings;
-  const totalProjectedIncome = realizedIncome + pendingIncome;
-  const projectedBalance = currentBalance + pendingIncome - pendingExpenses - pendingSavings + pendingSavingsWithdraw;
-
-  const getSpentByBucket = (bucket: string, includePending: boolean) => {
-    if (bucket === 'Reserva/Dívidas') {
-      const rs = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
-      const rw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
-      return rs - rw;
-    }
-    return txs
-      .filter(t => t.type === 'expense' && t.bucket === bucket && (includePending ? true : !t.isPending))
-      .reduce((sum, t) => sum + t.amount, 0);
-  };
-
-  const getCategoryTotals = (bucket: string, includePending: boolean) => {
-    const cats: Record<string, number> = {};
-    if (bucket === 'Reserva/Dívidas') {
-      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || t.type === 'transfer_between_accounts' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas')) && (includePending ? true : !t.isPending))
-         .forEach(t => {
-           const isAdd = t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva');
-           const val = isAdd ? t.amount : -t.amount;
-           cats[t.category] = (cats[t.category] || 0) + val;
-         });
-    } else {
-      txs.filter(t => t.type === 'expense' && t.bucket === bucket && (includePending ? true : !t.isPending))
-         .forEach(t => {
-           cats[t.category] = (cats[t.category] || 0) + t.amount;
-         });
-    }
-    return Object.entries(cats).sort((a, b) => b[1] - a[1]);
-  };
-
-  const isNegative = currentBalance < 0;
-
-  const strategies = useMemo(() => {
-    const strat: StrategyItem[] = [];
-    if (totalProjectedIncome === 0) {
-      strat.push({
-        id: 'no-income',
-        type: 'info',
-        title: 'Vamos começar a organizar!',
-        description: 'Parece que ainda não temos nenhuma renda registrada (recebida ou a receber) para este mês.',
-        actionable: 'Sugestão: Registre o seu salário ou outras rendas esperadas para que possamos fazer um planejamento financeiro completo para você.'
-      });
-      return strat;
-    }
-
-    // 1. Risco de Déficit Projetado (Falta de Dinheiro)
-    if (projectedBalance < 0) {
-      const pendingExpensesList = txs.filter(t => t.type === 'expense' && t.isPending).sort((a, b) => b.amount - a.amount);
-      
-      let actionable = '';
-      if (pendingExpensesList.length > 0) {
-        actionable = `Sugestão de Contador: Você tem despesas futuras cadastradas (como "${pendingExpensesList[0].description}" no valor de ${formatCurrency(pendingExpensesList[0].amount)}). Para não fechar o mês no vermelho, reavalie imediatamente se é possível cancelar ou adiar essas compras que ainda não foram pagas.`;
-      } else {
-        // Encontra a área com maior excesso
-        let worstBucket = '';
-        let maxOver = 0;
-        Object.entries(modeBuckets).forEach(([b, conf]) => {
-          const config = conf as { percentage: number; color: string; text: string };
-          const spent = getSpentByBucket(b, true);
-          const allocated = totalProjectedIncome * config.percentage;
-          if (spent - allocated > maxOver) {
-            maxOver = spent - allocated;
-            worstBucket = b;
-          }
-        });
-        
-        const topCat = worstBucket ? getCategoryTotals(worstBucket, false)[0] : null;
-        
-        actionable = topCat 
-          ? `Sugestão de Contador: O maior desvio do orçamento até agora ocorreu na categoria "${worstBucket}", com os gastos puxados por "${topCat[0]}". Tente não gastar mais nessa área e, se possível, busque uma renda extra para equilibrar as contas.` 
-          : `Sugestão de Contador: Os gastos que você já realizou ou registrou ultrapassaram sua renda prevista. A recomendação profissional imediata é pausar qualquer novo gasto que não seja vital.`;
-      }
-
-      strat.push({
-        id: 'deficit',
-        type: 'danger',
-        title: 'Alerta: Previsão de Falta de Dinheiro',
-        description: `Com base na sua renda atual e no que ainda vai receber (${formatCurrency(pendingIncome)}), somado aos gastos já feitos e contas futuras a pagar, a estimativa é que falte ${formatCurrency(Math.abs(projectedBalance))} no final do mês.`,
-        actionable
-      });
-    }
-
-    // 2. Alerta de Fluxo de Caixa (Descompasso de Datas)
-    if (projectedBalance >= 0 && currentBalance < pendingExpenses && pendingIncome > 0) {
-      strat.push({
-        id: 'cashflow',
-        type: 'warning',
-        title: 'Atenção ao Fluxo de Caixa (Datas)',
-        description: `Você tem ${formatCurrency(currentBalance)} disponíveis no caixa hoje, mas cadastrou ${formatCurrency(pendingExpenses)} em contas que ainda vão vencer. A conta só fechará no azul quando a renda futura prevista de ${formatCurrency(pendingIncome)} for efetivamente recebida.`,
-        actionable: `Sugestão de Contador: Certifique-se de que a renda futura vai cair na conta ANTES do vencimento das próximas contas. Caso contrário, negocie o adiamento das contas com os credores para evitar juros.`
-      });
-    }
-
-    // 3. Análise Dinâmica para Otimização
-    const vidaCategories = getCategoryTotals('Desejos', true);
-    const vidaTotalRealized = getSpentByBucket('Desejos', false);
-    const vidaTotalPending = getSpentByBucket('Desejos', true) - vidaTotalRealized;
-    const vidaTotal = vidaTotalRealized + vidaTotalPending;
-    
-    if (vidaTotal > (totalProjectedIncome * modeBuckets['Desejos'].percentage)) {
-      if (vidaCategories.length > 0) {
-        const biggestDrain = vidaCategories[0];
-        const drainPercent = (biggestDrain[1] / vidaTotal) * 100;
-        const overAmount = vidaTotal - (totalProjectedIncome * modeBuckets['Desejos'].percentage);
-        
-        strat.push({
-          id: 'pareto-vida',
-          type: 'warning',
-          title: 'Desejos consumindo acima do limite',
-          description: `Os gastos (pagos + futuros) com "Desejos" (lazer, supérfluos) já somam ${formatCurrency(vidaTotal)} e estouram o teto ideal de ${(modeBuckets['Desejos'].percentage * 100).toFixed(0)}% em ${formatCurrency(overAmount)}. Cerca de ${drainPercent.toFixed(0)}% deste valor está concentrado em "${biggestDrain[0]}".`,
-          actionable: `Sugestão de Contador: Para voltar aos trilhos sem dor, corte ou reduza drasticamente as próximas despesas com "${biggestDrain[0]}". Se houverem despesas futuras pendentes nessa categoria, tente cancelá-las.`
-        });
-      }
-    }
-
-    // 4. Análise de Custo Fixo
-    const necessidadesRealized = getSpentByBucket('Necessidades', false);
-    const necessidadesPending = getSpentByBucket('Necessidades', true) - necessidadesRealized;
-    const necessidadesTotal = necessidadesRealized + necessidadesPending;
-    const necessidadesLimit = totalProjectedIncome * modeBuckets['Necessidades'].percentage;
-    
-    if (necessidadesTotal > necessidadesLimit) {
-       const overAmount = necessidadesTotal - necessidadesLimit;
-       strat.push({
-         id: `bucket-necessidades-high`,
-         type: 'warning',
-         title: `Custo de Vida Básico Elevado`,
-         description: `Seus custos de vida essenciais (já pagos: ${formatCurrency(necessidadesRealized)} | a pagar: ${formatCurrency(necessidadesPending)}) comprometem mais de ${(modeBuckets['Necessidades'].percentage * 100).toFixed(0)}% da sua renda total projetada, excedendo o limite saudável em ${formatCurrency(overAmount)}.`,
-         actionable: `Sugestão de Contador: Custos fixos altos deixam você sem margem de manobra. Avalie suas contas futures e veja se pode renegociar contratos (aluguel, internet) ou mudar hábitos de consumo no supermercado.`
-       });
-    }
-
-    // 5. Planejamento de Crescimento (Reserva Financeira)
-    const currentSavRealized = getSpentByBucket('Reserva/Dívidas', false);
-    const currentSavPending = getSpentByBucket('Reserva/Dívidas', true) - currentSavRealized;
-    const currentSavTotal = currentSavRealized + currentSavPending;
-    const idealSavings = totalProjectedIncome * modeBuckets['Reserva/Dívidas'].percentage;
-    
-    if (currentSavTotal < idealSavings && projectedBalance > 0) {
-      const missingSavings = idealSavings - currentSavTotal;
-      strat.push({
-        id: `savings-growth`,
-        type: 'info',
-        title: 'Oportunidade para Aumentar a Reserva',
-        description: `Você separou ${formatCurrency(currentSavRealized)} já transferidos (mais ${formatCurrency(currentSavPending)} planejados) para economia ou pagamento de dívidas. O alvo ideal para o seu salário seria no mínimo ${formatCurrency(idealSavings)}. Como há uma sobra projetada no seu caixa, podemos melhorar isso!`,
-        actionable: projectedBalance >= missingSavings 
-          ? `Sugestão de Contador: Registre agora uma transferência futura de ${formatCurrency(missingSavings)} para a sua poupança ou investimentos. Acostume-se a investir a diferença antes de gastar com outras coisas.` 
-          : `Sugestão de Contador: A previsão é sobrar cerca de ${formatCurrency(projectedBalance)} após o pagamento de tudo. Planeje alocar todo esse saldo diretamente para a poupança.`
-      });
-    }
-
-    // 6. Sucesso
-    if (!strat.some(s => s.type === 'danger' || s.type === 'warning') && totalProjectedIncome > 0) {
-      strat.push({
-        id: 'success',
-        type: 'success',
-        title: 'Excelente Saúde Financeira!',
-        description: 'Meus parabéns! Analisando seus números, suas contas estão equilibradas. Seus gastos essenciais e estilo de vida estão dentro do planejado e o seu dinheiro está sendo bem direcionado.',
-        actionable: 'Sugestão de Contador: Continue com esse excelente controle! O próximo passo é estudar sobre investimentos para fazer o dinheiro poupado render ainda mais.'
-      });
-    }
-
-    return strat;
-  }, [txs, currentBalance, projectedBalance, totalProjectedIncome, pendingIncome, pendingExpenses]);
-
-  const getStatus = (name: string, spent: number, allocated: number) => {
-    if (allocated === 0) return 'neutral';
-    const percent = spent / allocated;
-    if (name === 'Reserva/Dívidas') {
-      if (percent >= 1.0) return 'good';
-      if (percent >= 0.5) return 'warning';
-      return 'danger';
-    } else {
-      if (percent > 1.05) return 'danger';
-      if (percent > 0.90) return 'warning';
-      return 'good';
+  // Friendly explanations for metrics
+  const metricDescriptions: Record<string, { title: string; desc: string }> = {
+    savingsRate: {
+      title: 'Taxa de Poupança',
+      desc: 'Este índice mostra o percentual de dinheiro que sobra limpo no fim do mês. Guardar parte do que você ganha é o motor para realizar seus sonhos e metas!'
+    },
+    dtiRatio: {
+      title: 'Índice DTI (Compromisso de Dívidas)',
+      desc: 'Mapeia quanto da sua renda mensal está sendo engolida pelo pagamento de parcelas, carnês ou dívidas ativas. O recomendado é manter esse percentual abaixo de 35% para evitar sufoco.'
+    },
+    fixedOverhead: {
+      title: 'Custo de Vida Fixo',
+      desc: 'Mede o peso das suas despesas fixas obrigatórias (como aluguel, condomínio, luz, água e mercado básico) sobre sua receita. O ideal de segurança é manter este valor sob 50%.'
+    },
+    runway: {
+      title: 'Runway (Reserva de Sobrevivência)',
+      desc: 'Mostra quantos meses você conseguiria honrar seus custos de vida caso ficasse sem qualquer receita a partir de hoje. É o índice que mede sua paz financeira e proteção em imprevistos.'
+    },
+    projection: {
+      title: 'Projeção de Fluxo de Caixa',
+      desc: 'A projeção é o espelho do seu amanhã com base na realidade de hoje. Ela calcula seu saldo futuro somando os ganhos recorrentes e subtraindo os pagamentos de parcelas, metas e contas anotadas de forma explícita. Sem dados inventados!'
     }
   };
+
+  // Action plan completed state (local UI feedback to allow checking items off)
+  const [completedTasks, setCompletedTasks] = useState<Record<string, boolean>>({});
+
+  // Memoized dynamic diagnostic engine
+  const diagnosis = useMemo(() => {
+    return generateFinancialDiagnosis(data, allData, previousBalance, debts, goals, accounts);
+  }, [data, allData, previousBalance, debts, goals, accounts]);
+
+  const toggleTask = (taskKey: string) => {
+    setCompletedTasks(prev => ({
+      ...prev,
+      [taskKey]: !prev[taskKey]
+    }));
+  };
+
+  // Color mappings
+  const modeStyles: Record<FinancialMode, { bg: string; text: string; border: string; desc: string }> = {
+    'Crise': {
+      bg: 'bg-rose-50 dark:bg-rose-950/20',
+      text: 'text-rose-600 dark:text-rose-400',
+      border: 'border-rose-200 dark:border-rose-900/30',
+      desc: 'Renda comprometida ou déficit. Foco total em proteção de caixa e quitação vital.'
+    },
+    'Sobrevivência': {
+      bg: 'bg-amber-50 dark:bg-amber-950/20',
+      text: 'text-amber-600 dark:text-amber-400',
+      border: 'border-amber-200 dark:border-amber-900/30',
+      desc: 'Contas pagas no limite, sem margem. Foco em estancar vazamentos e criar micro-reserva.'
+    },
+    'Estabilização': {
+      bg: 'bg-blue-50 dark:bg-blue-950/20',
+      text: 'text-blue-600 dark:text-blue-400',
+      border: 'border-blue-200 dark:border-blue-900/30',
+      desc: 'Orçamento equilibrado, mas com pouca reserva. Foco em poupar 15% e quitar parcelamentos.'
+    },
+    'Construção': {
+      bg: 'bg-emerald-50 dark:bg-emerald-950/20',
+      text: 'text-emerald-600 dark:text-emerald-400',
+      border: 'border-emerald-200 dark:border-emerald-900/30',
+      desc: 'Superávit saudável e constante. Foco em investimentos inteligentes e metas ousadas.'
+    },
+    'Expansão': {
+      bg: 'bg-indigo-50 dark:bg-indigo-950/20',
+      text: 'text-indigo-600 dark:text-indigo-400',
+      border: 'border-indigo-200 dark:border-indigo-900/30',
+      desc: 'Patrimônio blindado e renda passiva em crescimento. Foco em diversificação e liberdade.'
+    }
+  };
+
+  const riskStyles: Record<RiskLevel, { bg: string; text: string; badge: string }> = {
+    'Crítico': { bg: 'bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', badge: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' },
+    'Alto': { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', badge: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+    'Moderado': { bg: 'bg-blue-500/10', text: 'text-blue-600 dark:text-blue-400', badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+    'Baixo': { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
+    'Mínimo': { bg: 'bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', badge: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' }
+  };
+
+  const formatBRL = (val: number) => {
+    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  const hasNoData = data.transactions.length === 0 && debts.length === 0 && goals.length === 0;
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-24 text-left">
+      {/* Header Banner */}
       <header className="bg-slate-900 dark:bg-slate-950 p-6 sm:p-8 rounded-3xl shadow-xl text-white relative overflow-hidden border border-slate-800">
         <div className="absolute -right-10 -bottom-10 opacity-[0.03] dark:opacity-10 pointer-events-none">
           <BrainCircuit size={180} />
         </div>
         <div className="relative z-10">
-          <h2 className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-3">Inteligência Financeira</h2>
-          <p className="text-2xl sm:text-3xl font-bold mb-4 leading-tight text-white">Engenharia de Crescimento</p>
-          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50">
-            <p className="text-sm font-serif italic mb-3 text-slate-300">
-              "A riqueza do sábio é a sua coroa... Os planos bem elaborados levam à fartura; mas o apressado sempre acaba na miséria."
-            </p>
-            <p className="text-xs text-emerald-400 font-semibold text-right">— Princípio Milenar (Pv 14:24 / 21:5)</p>
-          </div>
+          <span className="text-[10px] font-black tracking-widest bg-emerald-500/20 text-emerald-400 uppercase py-1 px-3 rounded-full">
+            Módulo de Inteligência
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold mt-3 tracking-tight">Contador Pessoal Inteligente</h2>
+          <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-md">
+            Análise profunda de anotações, projeções matemáticas e consultoria de bolso baseada inteiramente nos dados do seu app.
+          </p>
         </div>
       </header>
 
-      {totalProjectedIncome === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <Target className="mx-auto text-slate-300 dark:text-slate-600 mb-4" size={48} />
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Adicione uma Receita</h3>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Para que o motor de análise gere um planejamento financeiro completo, você precisa adicionar ao menos uma receita (realizada ou pendente/futura) no mês.
+      {hasNoData ? (
+        <div className="glass-card p-10 text-center rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <Target className="mx-auto text-slate-300 dark:text-slate-600" size={56} />
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Sem dados suficientes</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
+            Para liberar a consultoria e os cálculos de projeção do seu contador, registre suas receitas, despesas, parcelamentos ou anotações na aba principal.
           </p>
         </div>
       ) : (
         <>
-          {/* Sessão de Análise Inteligente */}
-          <div className="glass-card p-6 sm:p-8">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-              <Activity className="text-emerald-500" size={22} />
-              Diagnóstico Estratégico
-            </h3>
+          {/* Main Status Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
-            <div className="space-y-4">
-              {strategies.map(strat => (
-                <div key={strat.id} className={`p-5 rounded-2xl border ${
-                  strat.type === 'danger' ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20' :
-                  strat.type === 'warning' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' :
-                  strat.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' :
-                  'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20'
-                }`}>
-                  <div className="flex gap-4">
-                    <div className="mt-1 shrink-0">
-                      {strat.type === 'danger' && <AlertTriangle className="text-rose-600 dark:text-rose-400" size={24} />}
-                      {strat.type === 'warning' && <AlertTriangle className="text-amber-600 dark:text-amber-400" size={24} />}
-                      {strat.type === 'success' && <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={24} />}
-                      {strat.type === 'info' && <Activity className="text-indigo-600 dark:text-indigo-400" size={24} />}
-                    </div>
-                    <div className="min-w-0">
-                      <h4 className={`text-base font-bold mb-2 ${
-                        strat.type === 'danger' ? 'text-rose-900 dark:text-rose-300' :
-                        strat.type === 'warning' ? 'text-amber-900 dark:text-amber-300' :
-                        strat.type === 'success' ? 'text-emerald-900 dark:text-emerald-300' :
-                        'text-indigo-900 dark:text-indigo-300'
-                      }`}>{strat.title}</h4>
-                      <p className={`text-sm leading-relaxed mb-4 ${
-                        strat.type === 'danger' ? 'text-rose-800 dark:text-rose-400/90' :
-                        strat.type === 'warning' ? 'text-amber-800 dark:text-amber-400/90' :
-                        strat.type === 'success' ? 'text-emerald-800 dark:text-emerald-400/90' :
-                        'text-indigo-800 dark:text-indigo-400/90'
-                      }`}>{strat.description}</p>
-                      
-                      <div className={`text-sm p-4 rounded-xl border ${
-                        strat.type === 'danger' ? 'bg-white/80 dark:bg-slate-900/60 border-rose-200/60 dark:border-rose-500/30 text-rose-900 dark:text-rose-200' :
-                        strat.type === 'warning' ? 'bg-white/80 dark:bg-slate-900/60 border-amber-200/60 dark:border-amber-500/30 text-amber-900 dark:text-amber-200' :
-                        strat.type === 'success' ? 'bg-white/80 dark:bg-slate-900/60 border-emerald-200/60 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-200' :
-                        'bg-white/80 dark:bg-slate-900/60 border-indigo-200/60 dark:border-indigo-500/30 text-indigo-900 dark:text-indigo-200'
-                      }`}>
-                        <div className="flex items-start gap-3">
-                          <ArrowRight size={18} className="mt-0.5 shrink-0 opacity-70" />
-                          <p className="leading-relaxed"><strong className="font-bold">Estratégia Aplicada:</strong> {strat.actionable}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {/* Financial Mode Diagnostic */}
+            <div className={`p-6 rounded-3xl border ${modeStyles[diagnosis.mode].border} ${modeStyles[diagnosis.mode].bg} space-y-4 shadow-sm`}>
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fase Financeira Atual</span>
+                  <h4 className={`text-2xl font-black ${modeStyles[diagnosis.mode].text}`}>{diagnosis.mode}</h4>
                 </div>
-              ))}
+                <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${riskStyles[diagnosis.riskLevel].badge}`}>
+                  Risco: {diagnosis.riskLevel}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                {modeStyles[diagnosis.mode].desc}
+              </p>
+              <div className="pt-3 border-t border-slate-200/40 dark:border-slate-800/40">
+                <h5 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                  <Compass size={14} className={modeStyles[diagnosis.mode].text} /> Diretriz Principal:
+                </h5>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                  {diagnosis.recommendation}
+                </p>
+              </div>
+            </div>
+
+            {/* Crucial Alerts & Problem Mappings */}
+            <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4">
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <AlertTriangle className="text-rose-500" size={14} /> Principal Gargalo / Alerta
+                </h4>
+                <p className="text-xs font-bold text-rose-700 dark:text-rose-400 leading-relaxed bg-rose-50 dark:bg-rose-950/10 p-3 rounded-2xl border border-rose-100 dark:border-rose-900/20">
+                  {diagnosis.mainProblem}
+                </p>
+              </div>
+
+              <div className="pt-2">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <CheckCircle2 className="text-emerald-500" size={14} /> Seus Pontos Fortes
+                </h4>
+                <ul className="space-y-1.5">
+                  {diagnosis.strongPoints.slice(0, 2).map((pt, index) => (
+                    <li key={index} className="text-xs text-slate-600 dark:text-slate-300 flex items-start gap-1.5 font-medium leading-tight">
+                      <span className="text-emerald-500 font-bold shrink-0">✓</span>
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Professional Financial Metrics Dashboard */}
+          <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Calculator size={18} className="text-emerald-500" />
+                Gauges e Projeções de Custos
+              </h3>
+              <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 animate-pulse bg-indigo-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                Clique nos <HelpCircle size={10} /> para entender
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              
+              {/* Savings Rate */}
+              <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
+                  Taxa de Poupança
+                  <button 
+                    onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'savingsRate' ? null : 'savingsRate')}
+                    className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                    title="Explicar"
+                  >
+                    <HelpCircle size={12} />
+                  </button>
+                </span>
+                <span className={`text-lg font-black block ${diagnosis.metrics.savingsRate > 20 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                  {diagnosis.metrics.savingsRate.toFixed(1)}%
+                </span>
+                <p className="text-[9px] text-slate-400 mt-1">Ideal: acima de 20%</p>
+              </div>
+
+              {/* Debt to Income Ratio */}
+              <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
+                  Índice DTI (Dívidas)
+                  <button 
+                    onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'dtiRatio' ? null : 'dtiRatio')}
+                    className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                    title="Explicar"
+                  >
+                    <HelpCircle size={12} />
+                  </button>
+                </span>
+                <span className={`text-lg font-black block ${diagnosis.metrics.dtiRatio > 35 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                  {diagnosis.metrics.dtiRatio.toFixed(1)}%
+                </span>
+                <p className="text-[9px] text-slate-400 mt-1">Alerta: acima de 35%</p>
+              </div>
+
+              {/* Fixed Cost Overhead */}
+              <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
+                  Custo de Vida Fixo
+                  <button 
+                    onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'fixedOverhead' ? null : 'fixedOverhead')}
+                    className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                    title="Explicar"
+                  >
+                    <HelpCircle size={12} />
+                  </button>
+                </span>
+                <span className={`text-lg font-black block ${diagnosis.metrics.fixedOverheadIndex > 65 ? 'text-amber-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                  {diagnosis.metrics.fixedOverheadIndex.toFixed(1)}%
+                </span>
+                <p className="text-[9px] text-slate-400 mt-1">Recomendado: até 50%</p>
+              </div>
+
+              {/* Runway months */}
+              <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
+                  Runway (Proteção)
+                  <button 
+                    onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'runway' ? null : 'runway')}
+                    className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                    title="Explicar"
+                  >
+                    <HelpCircle size={12} />
+                  </button>
+                </span>
+                <span className={`text-lg font-black block ${diagnosis.metrics.runwayMonths < 1 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {diagnosis.metrics.runwayMonths === 99 ? '∞' : `${diagnosis.metrics.runwayMonths.toFixed(1)}m`}
+                </span>
+                <p className="text-[9px] text-slate-400 mt-1">Garante paz em emergências</p>
+              </div>
+
+            </div>
+
+            {/* Dynamic Metric Explanation Drawer */}
+            {selectedMetricHelp && metricDescriptions[selectedMetricHelp] && (
+              <div className="bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-950/20 p-4 rounded-2xl relative animate-in fade-in slide-in-from-top-2 duration-200">
+                <button 
+                  onClick={() => setSelectedMetricHelp(null)}
+                  className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                  title="Fechar explicação"
+                >
+                  <X size={14} />
+                </button>
+                <h5 className="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mb-1.5">
+                  <HelpCircle size={14} className="text-indigo-500" />
+                  Como ler seu indicador: {metricDescriptions[selectedMetricHelp].title}
+                </h5>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed pr-6">
+                  {metricDescriptions[selectedMetricHelp].desc}
+                </p>
+              </div>
+            )}
+
+            {/* Calculations and Surplus info */}
+            <div className="bg-slate-100/50 dark:bg-slate-900/30 p-4 rounded-2xl text-xs space-y-2">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium">
+                <span>Total de Recursos Disponíveis (Patrimônio Líquido Estimado):</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{formatBRL(diagnosis.metrics.totalAssets)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium">
+                <span>Dívidas de Consumo/Passivos Ativos:</span>
+                <span className="font-bold text-rose-500">-{formatBRL(diagnosis.metrics.totalDebts)}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium pt-2 border-t border-slate-200 dark:border-slate-800">
+                <span>Sobras Reais do Período (Superávit Livre):</span>
+                <span className={`font-black ${diagnosis.metrics.monthlySurplus >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {formatBRL(diagnosis.metrics.monthlySurplus)}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="glass-card p-6 sm:p-8">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-              <BarChart4 className="text-emerald-500" size={22} />
-              Auditoria de Alocação de Capital
+          {/* Parsed / Recognized commitments from text notes */}
+          {diagnosis.parsedCommitments.length > 0 && (
+            <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <RefreshCw size={12} className="animate-spin-slow text-indigo-500" />
+                Compromissos e Padrões Mapeados nas Anotações
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {diagnosis.parsedCommitments.map((c, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex items-start gap-2 text-xs">
+                    <span className="mt-0.5">
+                      {c.type === 'receita' && '💰'}
+                      {c.type === 'despesa' && '💸'}
+                      {c.type === 'divida' && '⚠️'}
+                      {c.type === 'oportunidade' && '🎯'}
+                      {c.type === 'aviso' && 'ℹ️'}
+                    </span>
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase">{c.category}</span>
+                      <p className="text-slate-700 dark:text-slate-300 font-semibold">{c.text}</p>
+                      {c.amount && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                          Montante: {formatBRL(c.amount)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
+
+          {/* Structured Interactive Action Plan */}
+          <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-5">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                <Zap size={18} className="text-amber-500" />
+                Roteiro de Ação Recomendado (Checklist)
+              </h3>
+              <span className="text-[10px] font-bold text-slate-400">
+                Complete as metas do ciclo
+              </span>
+            </div>
+
+            <div className="space-y-6">
+              
+              {/* TODAY */}
+              {diagnosis.actionPlan.today.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-rose-500 dark:text-rose-400 flex items-center gap-1.5 uppercase">
+                    <Clock size={12} /> Hoje (Foco Imediato)
+                  </h4>
+                  <div className="space-y-1.5">
+                    {diagnosis.actionPlan.today.map((task, i) => {
+                      const key = `today-${i}`;
+                      const isDone = completedTasks[key];
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => toggleTask(key)}
+                          className={`p-3 rounded-2xl border transition-all flex items-start gap-2.5 cursor-pointer text-xs select-none ${
+                            isDone 
+                              ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-100 dark:border-slate-800 line-through' 
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-rose-100 dark:border-rose-950/20 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={!!isDone} 
+                            readOnly 
+                            className="mt-0.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" 
+                          />
+                          <span>{task}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* NEXT 7 DAYS */}
+              {diagnosis.actionPlan.next7Days.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-amber-500 flex items-center gap-1.5 uppercase">
+                    <Clock size={12} /> Próximos 7 dias (Tático)
+                  </h4>
+                  <div className="space-y-1.5">
+                    {diagnosis.actionPlan.next7Days.map((task, i) => {
+                      const key = `week-${i}`;
+                      const isDone = completedTasks[key];
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => toggleTask(key)}
+                          className={`p-3 rounded-2xl border transition-all flex items-start gap-2.5 cursor-pointer text-xs select-none ${
+                            isDone 
+                              ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-100 dark:border-slate-800 line-through' 
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-amber-100 dark:border-amber-950/20 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={!!isDone} 
+                            readOnly 
+                            className="mt-0.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" 
+                          />
+                          <span>{task}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* NEXT 30 DAYS */}
+              {diagnosis.actionPlan.next30Days.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-emerald-500 flex items-center gap-1.5 uppercase">
+                    <Clock size={12} /> Próximos 30 dias (Mensal)
+                  </h4>
+                  <div className="space-y-1.5">
+                    {diagnosis.actionPlan.next30Days.map((task, i) => {
+                      const key = `month-${i}`;
+                      const isDone = completedTasks[key];
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => toggleTask(key)}
+                          className={`p-3 rounded-2xl border transition-all flex items-start gap-2.5 cursor-pointer text-xs select-none ${
+                            isDone 
+                              ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-100 dark:border-slate-800 line-through' 
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-emerald-100 dark:border-emerald-950/20 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={!!isDone} 
+                            readOnly 
+                            className="mt-0.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" 
+                          />
+                          <span>{task}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* NEXT 90 DAYS */}
+              {diagnosis.actionPlan.next90Days && diagnosis.actionPlan.next90Days.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-indigo-500 flex items-center gap-1.5 uppercase">
+                    <Clock size={12} /> Próximos 90 dias (Estratégico)
+                  </h4>
+                  <div className="space-y-1.5">
+                    {diagnosis.actionPlan.next90Days.map((task, i) => {
+                      const key = `strategic-${i}`;
+                      const isDone = completedTasks[key];
+                      return (
+                        <div 
+                          key={i} 
+                          onClick={() => toggleTask(key)}
+                          className={`p-3 rounded-2xl border transition-all flex items-start gap-2.5 cursor-pointer text-xs select-none ${
+                            isDone 
+                              ? 'bg-slate-100 dark:bg-slate-800/40 text-slate-400 border-slate-100 dark:border-slate-800 line-through' 
+                              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-indigo-100 dark:border-indigo-950/20 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={!!isDone} 
+                            readOnly 
+                            className="mt-0.5 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500" 
+                          />
+                          <span>{task}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </div>
+
+          {/* Professional Cashflow Projections */}
+          <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+              <TrendingUp size={18} className="text-indigo-500" />
+              Projeção de Fluxo de Caixa (Próximos 3 Ciclos)
+              <button 
+                onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'projection' ? null : 'projection')}
+                className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors inline-flex ml-1 items-center"
+                title="Explicar projeção"
+              >
+                <HelpCircle size={14} />
+              </button>
             </h3>
             
-            <div className="space-y-8">
-              {Object.entries(modeBuckets).map(([name, conf]) => {
-                const config = conf as { percentage: number; color: string; text: string };
-                const allocated = totalProjectedIncome * config.percentage;
-                const spent = getSpentByBucket(name, true);
-                const status = getStatus(name, spent, allocated);
-                
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Cálculo estimado do seu saldo futuro baseado estritamente em suas metas, parcelas ativas e anotações financeiras cadastradas.
+            </p>
+
+            <div className="space-y-3 pt-2">
+              {diagnosis.projections.map((p, idx) => {
+                const isNoFutureData = idx > 0 && p.projectedIncome === 0 && p.projectedExpense === 0;
                 return (
-                  <div key={name} className="relative">
-                    <div className="flex justify-between items-end mb-3">
-                      <div>
-                        <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">
-                          {name}{' '}
-                          <span className="text-slate-400 font-medium text-sm ml-1">
-                            ({name === 'Reserva/Dívidas' ? 'Meta' : 'Teto'} de {(config.percentage * 100).toFixed(0)}%)
-                          </span>
-                        </h4>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-                          Consolidado: {formatCurrency(spent)} <span className="mx-1 text-slate-300 dark:text-slate-600">/</span> {formatCurrency(allocated)}
-                        </p>
+                  <div key={idx} className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row justify-between sm:items-center gap-3 text-xs">
+                    <div>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{p.period}</span>
+                      {isNoFutureData ? (
+                        <div className="mt-1 text-[10px] text-amber-500 dark:text-amber-400/80 font-medium italic">
+                          Sem lançamentos futuros ou dívidas ativas planejadas para este mês.
+                        </div>
+                      ) : (
+                        <div className="flex gap-4 mt-1 text-[10px] text-slate-500">
+                          <span>Receita: <span className="font-bold text-slate-700 dark:text-slate-300">{formatBRL(p.projectedIncome)}</span></span>
+                          <span>Despesa: <span className="font-bold text-slate-700 dark:text-slate-300">{formatBRL(p.projectedExpense)}</span></span>
+                        </div>
+                      )}
+                    </div>
+                    {!isNoFutureData && (
+                      <div className="sm:text-right">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Saldo Acumulado Projetado</span>
+                        <span className={`text-sm font-black ${p.projectedBalance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {formatBRL(p.projectedBalance)}
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-bold tracking-wider uppercase px-2.5 py-1.5 rounded-lg ${
-                        status === 'danger' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
-                        status === 'warning' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
-                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-                      }`}>
-                        {name === 'Reserva/Dívidas' ? (
-                          status === 'good' ? (spent > allocated ? 'Superávit!' : 'Meta Atingida') :
-                          status === 'warning' ? 'Abaixo do Alvo' : 'Alerta Poupança'
-                        ) : (
-                          status === 'danger' ? 'Sinal Vermelho' :
-                          status === 'warning' ? 'Teto Próximo' :
-                          'Dentro da Meta'
-                        )}
-                      </span>
-                    </div>
-                    
-                    <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-3 rounded-full overflow-hidden mb-3 border border-slate-200 dark:border-slate-700">
-                      <div 
-                        className={`h-full transition-all duration-700 ${
-                          status === 'danger' ? 'bg-rose-500' :
-                          status === 'warning' ? 'bg-amber-500' :
-                          'bg-emerald-500'
-                        }`}
-                        style={{ width: `${Math.min((spent / (allocated || 1)) * 100, 100)}%` }}
-                      />
-                    </div>
-                    
-                    <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                      {name === 'Necessidades' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida (moradia, contas, mercado) abaixo de {(config.percentage * 100).toFixed(0)}% garante elasticidade contra imprevistos financeiros.</p>
-                      )}
-                      {name === 'Desejos' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Conforto. Limite de {(config.percentage * 100).toFixed(0)}% destinado ao estilo de vida e escolhas pessoais. É o primeiro centro de custos que deve sofrer cortes em tempos difíceis.</p>
-                      )}
-                      {name === 'Reserva/Dívidas' && (
-                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador e Segurança. A retenção ou amortização de {(config.percentage * 100).toFixed(0)}% acelera sua saída de dívidas, financiando seu colchão de segurança e o futuro.</p>
-                      )}
-                    </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
+
+          {/* Educational Insight Corner */}
+          {diagnosis.insights.length > 0 && (
+            <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 text-white space-y-4">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Lightbulb size={16} className="text-amber-400" /> Insight de Educação Financeira
+              </h3>
+              <div className="space-y-3">
+                {diagnosis.insights.map((insight, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="p-1.5 bg-white/10 rounded-full shrink-0">
+                      <Info size={14} className="text-amber-300" />
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed italic">"{insight}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </>
       )}
+
     </div>
   );
 }

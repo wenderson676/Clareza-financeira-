@@ -65,4 +65,9 @@ export interface AppState {
   debts?: Debt[];
   dashboardCardOrder?: string[];
   accounts?: Account[];
+  customCategories?: {
+    expense?: string[];
+    income?: string[];
+    transfer?: string[];
+  };
 }

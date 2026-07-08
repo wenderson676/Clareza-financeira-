@@ -635,8 +635,13 @@ export default function App() {
           {currentTab === 'planning' && (
             <Planning 
               data={monthData} 
+              allData={state.monthlyData}
               previousBalance={getAccumulatedBalance(monthId)} 
               budgetMode={state.budgetMode || '50-30-20'}
+              debts={state.debts || []}
+              goals={state.goals}
+              accounts={state.accounts || []}
+              onSaveNote={(note) => setDevotionalNote(monthId, note)}
             />
           )}
           {currentTab === 'comparison' && (

@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { Transaction, TransactionType, Bucket, AccountType, Account } from '../types';
 import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { useStore } from '../lib/store';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface TransactionModalProps {
 }
 
 export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab, accountBalances, accounts }: TransactionModalProps) {
+  const { state, addCustomCategory } = useStore();
   const [formTab, setFormTab] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [transferFrom, setTransferFrom] = useState<AccountType>('banco');
   const [transferTo, setTransferTo] = useState<AccountType>('reserva');
@@ -27,6 +29,54 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
   const [isPending, setIsPending] = useState(false);
   const [account, setAccount] = useState<AccountType>('banco');
   const [error, setError] = useState('');
+
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+
+  const getAvailableCategories = () => {
+    if (formTab === 'income') {
+      const defaultCats = CATEGORIES['Renda'] || [];
+      const customCats = state.customCategories?.income || [];
+      return [...defaultCats, ...customCats];
+    } else if (formTab === 'transfer') {
+      const defaultCats = [
+        'Aporte Cofrinho',
+        'Resgate de Reserva',
+        'Transferência de Saldos',
+        'Investimentos',
+        'Ajuste de Conta'
+      ];
+      const customCats = state.customCategories?.transfer || [];
+      return [...defaultCats, ...customCats];
+    } else {
+      const defaultCats = CATEGORIES[bucket] || [];
+      const customCats = state.customCategories?.expense || [];
+      return [...defaultCats, ...customCats];
+    }
+  };
+
+  const availableCategories = getAvailableCategories();
+
+  const handleCreateCustomCategory = () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    
+    const type = formTab === 'expense' ? 'expense' : formTab === 'income' ? 'income' : 'transfer';
+    addCustomCategory(type, trimmed);
+    setCategory(trimmed);
+    setNewCatName('');
+    setIsAddingCustom(false);
+  };
+
+  // Auto-select first category if empty or not in the list (unless editing)
+  useEffect(() => {
+    if (isOpen && !editingTransaction) {
+      const cats = getAvailableCategories();
+      if (cats.length > 0 && (!category || !cats.includes(category))) {
+        setCategory(cats[0]);
+      }
+    }
+  }, [formTab, bucket, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -210,40 +260,54 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4 sm:p-0"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4"
           onClick={onClose}
         >
           <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+            className="bg-white dark:bg-slate-900 w-full max-w-[350px] rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden border border-slate-100 dark:border-slate-800"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
-              </h3>
-              <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                <X size={24} />
+            {/* Fixed Header */}
+            <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  {editingTransaction ? 'Editar Lançamento' : 'Novo Lançamento'}
+                </h3>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                  {formTab === 'expense' ? 'Registrar uma despesa' : formTab === 'income' ? 'Registrar uma receita' : 'Transferência entre contas'}
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={onClose} 
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                aria-label="Fechar"
+              >
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              
+            {/* Scrollable Form Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5 scrollbar-thin">
               {error && (
-                <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 p-3 rounded-lg text-sm">
+                <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 p-2.5 rounded-lg text-xs leading-relaxed">
                   {error}
                 </div>
               )}
 
-              <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+              {/* Transaction Type Tabs */}
+              <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <button
                   type="button"
                   onClick={() => { setFormTab(initialTab || 'expense'); setCategory(''); }}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    formTab === 'expense' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
+                    formTab === 'expense' 
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600 dark:text-rose-400' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
                 >
                   Gasto
@@ -251,8 +315,10 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 <button
                   type="button"
                   onClick={() => { setFormTab('income'); setCategory(''); setBucket('Renda'); }}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    formTab === 'income' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
+                    formTab === 'income' 
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
                 >
                   Receita
@@ -260,22 +326,25 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 <button
                   type="button"
                   onClick={() => { setFormTab('transfer'); setCategory(''); }}
-                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                    formTab === 'transfer' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
+                    formTab === 'transfer' 
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
                 >
-                  Transferência
+                  Transf.
                 </button>
               </div>
 
+              {/* Transfer Accounts */}
               {formTab === 'transfer' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-200">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">De (Origem)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">De (Origem)</label>
                     <select
                       value={transferFrom}
                       onChange={e => setTransferFrom(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                      className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-2.5 outline-none focus:border-indigo-500 transition-all text-xs font-semibold"
                     >
                       {(accounts && accounts.length > 0 ? accounts : [
                         { id: 'banco', name: 'Banco', icon: '🏦' },
@@ -287,11 +356,11 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Para (Destino)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Para (Destino)</label>
                     <select
                       value={transferTo}
                       onChange={e => setTransferTo(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                      className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-2.5 outline-none focus:border-indigo-500 transition-all text-xs font-semibold"
                     >
                       {(accounts && accounts.length > 0 ? accounts : [
                         { id: 'banco', name: 'Banco', icon: '🏦' },
@@ -305,18 +374,17 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 </div>
               )}
 
+              {/* Amount Field */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Valor</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Valor</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">R$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500">R$</span>
                   <input
                     type="text"
                     required
                     value={amount}
                     onChange={e => {
-                      // Allow numbers and comma
                       const val = e.target.value.replace(/[^0-9,]/g, '');
-                      // Only allow one comma
                       const parts = val.split(',');
                       if (parts.length > 2) {
                         setAmount(parts[0] + ',' + parts.slice(1).join(''));
@@ -324,42 +392,48 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                         setAmount(val);
                       }
                     }}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 pl-10 pr-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-semibold text-lg"
+                    className={`w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-950 dark:text-white rounded-lg py-2.5 pl-9 pr-3 outline-none transition-all font-bold text-base focus:ring-1 ${
+                      formTab === 'expense' 
+                        ? 'focus:border-rose-500 focus:ring-rose-500/20 text-rose-600 dark:text-rose-400' 
+                        : formTab === 'income' 
+                          ? 'focus:border-emerald-500 focus:ring-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+                          : 'focus:border-indigo-500 focus:ring-indigo-500/20 text-indigo-600 dark:text-indigo-400'
+                    }`}
                     placeholder="0,00"
                   />
                 </div>
               </div>
 
+              {/* Description Field */}
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Descrição</label>
                 <input
                   type="text"
                   required
                   value={description}
-                  onChange={e => {
-                    setDescription(e.target.value);
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                  onChange={e => setDescription(e.target.value)}
+                  className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-3 outline-none focus:border-slate-400 text-xs font-medium"
                   placeholder="Ex: Mercado, Salário, etc."
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Date & Bucket Grid */}
+              <div className={formTab === 'expense' ? "grid grid-cols-2 gap-3" : "w-full"}>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Data</label>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Data</label>
                   <input
                     type="date"
                     required
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-2.5 outline-none focus:border-slate-400 text-xs font-medium"
                     style={{ colorScheme: 'light dark' }}
                   />
                 </div>
                 
                 {formTab === 'expense' && (
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Balde</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Balde</label>
                     <select
                       value={bucket}
                       onChange={e => {
@@ -370,7 +444,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                           setAccount('banco');
                         }
                       }}
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                      className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-2 transition-all text-xs font-semibold"
                     >
                       <option value="Necessidades">Necessidades</option>
                       <option value="Desejos">Desejos</option>
@@ -380,34 +454,111 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 )}
               </div>
 
-              {formTab !== 'transfer' && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                  <input
-                    required
-                    list="categories-list"
-                    value={category}
-                    onChange={e => setCategory(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                    placeholder="Selecione ou digite uma nova categoria..."
-                  />
-                  <datalist id="categories-list">
-                    {(formTab === 'income' ? CATEGORIES['Renda'] : CATEGORIES[bucket]).map(cat => (
-                      <option key={cat} value={cat} />
-                    ))}
-                  </datalist>
+              {/* Categories block */}
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Categoria</label>
+                  {category && (
+                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                      formTab === 'expense' 
+                        ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400' 
+                        : formTab === 'income' 
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                          : 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    }`}>
+                      {category}
+                    </span>
+                  )}
                 </div>
-              )}
+                
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border border-slate-200/80 dark:border-slate-800 rounded-lg bg-slate-50/30 dark:bg-slate-900/10 scrollbar-thin">
+                  {availableCategories.map(cat => {
+                    const isSelected = category === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setCategory(cat)}
+                        className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-150 cursor-pointer ${
+                          isSelected
+                            ? formTab === 'expense'
+                              ? 'bg-rose-600 text-white shadow-sm shadow-rose-500/25'
+                              : formTab === 'income'
+                                ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/25'
+                                : 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/25'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-150 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                  
+                  {!isAddingCustom ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingCustom(true)}
+                      className={`px-2 py-1 rounded text-[11px] font-bold border border-dashed transition-all cursor-pointer ${
+                        formTab === 'expense'
+                          ? 'bg-rose-50/50 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/20 hover:bg-rose-100/50'
+                          : formTab === 'income'
+                            ? 'bg-emerald-50/50 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-100/50'
+                            : 'bg-indigo-50/50 dark:bg-indigo-500/5 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/20 hover:bg-indigo-100/50'
+                      }`}
+                    >
+                      + Nova
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1 w-full mt-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <input
+                        type="text"
+                        placeholder="Nome..."
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleCreateCustomCategory();
+                          }
+                        }}
+                        className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded px-2 py-0.5 text-[11px] outline-none focus:border-slate-400"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateCustomCategory}
+                        className={`px-2 py-0.5 text-[11px] font-semibold text-white rounded transition-colors cursor-pointer ${
+                          formTab === 'expense'
+                            ? 'bg-rose-600 hover:bg-rose-700'
+                            : formTab === 'income'
+                              ? 'bg-emerald-600 hover:bg-emerald-700'
+                              : 'bg-indigo-600 hover:bg-indigo-700'
+                        }`}
+                      >
+                        OK
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsAddingCustom(false); setNewCatName(''); }}
+                        className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
 
+              {/* Account Selection */}
               {formTab !== 'transfer' && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
                     {formTab === 'expense' ? 'Pagar usando' : 'Receber em'}
                   </label>
                   <select
                     value={account === 'reserva' && bucket === 'Reserva/Dívidas' ? 'banco' : account}
                     onChange={e => setAccount(e.target.value as AccountType)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-sm"
+                    className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-2.5 outline-none focus:border-slate-400 text-xs font-semibold"
                   >
                     {(accounts && accounts.length > 0 ? accounts : [
                       { id: 'banco', name: 'Banco', icon: '🏦' },
@@ -420,37 +571,52 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-2">
+              {/* Pending Switcher */}
+              <div className="flex items-center gap-2 pt-1">
                 <input 
                   type="checkbox" 
                   id="isPending"
                   checked={isPending}
                   onChange={(e) => setIsPending(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                  className={`w-3.5 h-3.5 rounded border-slate-300 focus:ring-opacity-20 ${
+                    formTab === 'expense' 
+                      ? 'text-rose-600 focus:ring-rose-500' 
+                      : formTab === 'income'
+                        ? 'text-emerald-600 focus:ring-emerald-500'
+                        : 'text-indigo-600 focus:ring-indigo-500'
+                  }`}
                 />
-                <label htmlFor="isPending" className="text-sm text-slate-700 dark:text-slate-300">
+                <label htmlFor="isPending" className="text-xs font-semibold text-slate-600 dark:text-slate-400 cursor-pointer select-none">
                   Lançamento futuro (pendente)
                 </label>
               </div>
+            </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                {!editingTransaction && (
-                  <button
-                    type="button"
-                    onClick={() => handleSaveTransaction(false)}
-                    className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl py-3.5 transition-colors text-sm"
-                  >
-                    Salvar e Continuar
-                  </button>
-                )}
+            {/* Fixed/Sticky Footer Actions */}
+            <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 p-3 flex gap-2">
+              {!editingTransaction && (
                 <button
-                  type="submit"
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl py-3.5 transition-colors text-sm shadow-md"
+                  type="button"
+                  onClick={() => handleSaveTransaction(false)}
+                  className="flex-1 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-lg py-2 transition-all text-xs cursor-pointer text-center"
                 >
-                  {editingTransaction ? 'Atualizar' : 'Salvar e Fechar'}
+                  Continuar
                 </button>
-              </div>
-            </form>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSaveTransaction(true)}
+                className={`flex-1 text-white font-bold rounded-lg py-2 transition-all text-xs cursor-pointer shadow-md text-center ${
+                  formTab === 'expense'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/10'
+                    : formTab === 'income'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10'
+                      : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/10'
+                }`}
+              >
+                {editingTransaction ? 'Atualizar' : 'Salvar'}
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}
