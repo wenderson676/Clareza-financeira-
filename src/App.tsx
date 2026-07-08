@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Comparison } from './components/Comparison';
@@ -7,6 +7,7 @@ import { Planning } from './components/Planning';
 import { TransactionModal } from './components/TransactionModal';
 import { ActionMenuModal } from './components/ActionMenuModal';
 import { GoalModal } from './components/GoalModal';
+import { TutorialTour } from './components/TutorialTour';
 import { useStore } from './lib/store';
 import { format, addMonths, subMonths, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -64,6 +65,7 @@ export default function App() {
 
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isInstallApkModalOpen, setIsInstallApkModalOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
   const [installPlatform, setInstallPlatform] = useState<'android' | 'ios'>('android');
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackType, setFeedbackType] = useState<'defeito' | 'sugestao' | 'outro'>('defeito');
@@ -72,6 +74,40 @@ export default function App() {
   });
   const [feedbackPopupVisible, setFeedbackPopupVisible] = useState(false);
   const [feedbackPopupStep, setFeedbackPopupStep] = useState<'ask' | 'info'>('ask');
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch) {
+      touchStartX.current = touch.clientX;
+      touchStartY.current = touch.clientY;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null || isSidebarOpen) return;
+
+    const touch = e.touches[0];
+    if (touch) {
+      const diffX = touch.clientX - touchStartX.current;
+      const diffY = touch.clientY - touchStartY.current;
+
+      // Se começar perto da borda esquerda (< 60px) e deslizar para a direita (> 60px)
+      // com pouca movimentação vertical (< 35px) para evitar conflitos ao rolar a página
+      if (touchStartX.current < 60 && diffX > 60 && Math.abs(diffY) < 35) {
+        setIsSidebarOpen(true);
+        touchStartX.current = null;
+        touchStartY.current = null;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
 
   useEffect(() => {
     if (dontShowFeedbackPopup) return;
@@ -241,12 +277,18 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans pb-safe transition-colors duration-300">
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans pb-safe transition-colors duration-300"
+    >
       <div className="max-w-xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 shadow-2xl relative flex flex-col overflow-hidden transition-colors duration-300">
         
         {/* Header */}
         <header className="px-6 pt-12 pb-4 sticky top-0 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md z-30 flex justify-center items-center">
           <button 
+            id="sidebar-trigger"
             onClick={() => setIsSidebarOpen(true)}
             className="p-2 -ml-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors absolute left-6"
           >
@@ -282,7 +324,7 @@ export default function App() {
                 animate={{ x: 0 }}
                 exit={{ x: '-100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                className="fixed top-0 left-0 bottom-0 w-3/4 max-w-sm bg-white dark:bg-slate-900 z-50 shadow-2xl flex flex-col"
+                className="fixed top-0 left-0 bottom-0 w-3/4 max-w-sm bg-white dark:bg-slate-900 z-50 shadow-2xl flex flex-col overflow-y-auto pb-8"
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 pt-12">
                   <div className="flex justify-between items-center mb-6">
@@ -356,6 +398,17 @@ export default function App() {
                         onChange={handleImportData}
                       />
                     </label>
+
+                     <button 
+                      onClick={() => {
+                        setIsTourOpen(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium transition-colors text-left cursor-pointer"
+                    >
+                      <HelpCircle size={20} />
+                      Como Usar o App (Tutorial)
+                    </button>
 
                     <button 
                       onClick={() => {
@@ -932,7 +985,10 @@ export default function App() {
 
                 <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 shrink-0">
                   <button
-                    onClick={() => setIsInstallApkModalOpen(false)}
+                    onClick={() => {
+                      setIsInstallApkModalOpen(false);
+                      setIsTourOpen(true);
+                    }}
                     className="w-full py-3 px-6 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors cursor-pointer shadow-md"
                   >
                     Entendido, Começar a Usar!
@@ -944,15 +1000,28 @@ export default function App() {
         </AnimatePresence>
 
 
+        {/* Tutorial Tour */}
+        <TutorialTour
+          isOpen={isTourOpen}
+          onClose={() => setIsTourOpen(false)}
+          currentTab={currentTab}
+          setCurrentTab={setCurrentTab}
+          openSidebar={() => setIsSidebarOpen(true)}
+          closeSidebar={() => setIsSidebarOpen(false)}
+        />
+
+
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 w-full max-w-xl bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-safe transition-colors duration-300">
           <NavItem 
+            id="nav-home"
             icon={<Home size={24} />} 
             label="Início" 
             isActive={currentTab === 'dashboard'} 
             onClick={() => setCurrentTab('dashboard')} 
           />
           <NavItem 
+            id="nav-transactions"
             icon={<ListOrdered size={24} />} 
             label="Extrato" 
             isActive={currentTab === 'transactions'} 
@@ -962,6 +1031,7 @@ export default function App() {
           {/* Centered Add Button */}
           <div className="relative -top-6">
             <button
+              id="nav-add-btn"
               onClick={handleOpenActionMenu}
               className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex items-center justify-center hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all"
             >
@@ -970,12 +1040,14 @@ export default function App() {
           </div>
 
           <NavItem 
+            id="nav-planning"
             icon={<Target size={24} />} 
             label="Contador" 
             isActive={currentTab === 'planning'} 
             onClick={() => setCurrentTab('planning')} 
           />
           <NavItem 
+            id="nav-comparison"
             icon={<BarChart2 size={24} />}
             label="Análise"
             isActive={currentTab === 'comparison'}
@@ -987,9 +1059,10 @@ export default function App() {
   );
 }
 
-function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
+function NavItem({ id, icon, label, isActive, onClick }: { id?: string, icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
   return (
     <button 
+      id={id}
       onClick={onClick}
       className={`flex flex-col items-center gap-1 min-w-[70px] transition-colors ${
         isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'

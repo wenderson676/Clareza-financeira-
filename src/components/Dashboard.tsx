@@ -716,7 +716,7 @@ export function Dashboard({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <div id="dashboard-accounts" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {accounts.map(acc => {
             const bal = accountBalances[acc.id] || 0;
             return (
