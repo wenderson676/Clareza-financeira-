@@ -43,12 +43,19 @@ export function Planning({ data, previousBalance, budgetMode = '50-30-20', allDa
     }).reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const getStatus = (spent: number, allocated: number) => {
-    if (allocated === 0) return spent > 0 ? 'danger' : 'success';
+  const getStatus = (spent: number, allocated: number, isSavings: boolean) => {
+    if (isSavings) {
+      if (allocated === 0) return "success";
+      const ratio = spent / allocated;
+      if (ratio >= 1) return "success";
+      if (ratio >= 0.5) return "warning";
+      return "danger";
+    }
+    if (allocated === 0) return spent > 0 ? "danger" : "success";
     const ratio = spent / allocated;
-    if (ratio >= 1) return 'danger';
-    if (ratio >= 0.85) return 'warning';
-    return 'success';
+    if (ratio >= 1) return "danger";
+    if (ratio >= 0.85) return "warning";
+    return "success";
   };
 
   const advices = useMemo(() => {
@@ -255,7 +262,8 @@ export function Planning({ data, previousBalance, budgetMode = '50-30-20', allDa
             const config = conf as { percentage: number; color: string; text: string };
             const allocated = totalProjectedIncome * config.percentage;
             const spent = getSpentByBucket(name, true);
-            const status = getStatus(spent, allocated);
+            const isSavings = name === "Reserva/Dívidas";
+            const status = getStatus(spent, allocated, isSavings);
             
             return (
               <div key={name} className="relative group">
@@ -271,7 +279,7 @@ export function Planning({ data, previousBalance, budgetMode = '50-30-20', allDa
                     status === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400' :
                     'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
                   }`}>
-                    {status === 'danger' ? 'Alerta Crítico' : status === 'warning' ? 'Atenção ao Teto' : 'Controle Excelente'}
+                    {isSavings ? (status === 'success' ? 'Meta Atingida' : status === 'warning' ? 'Abaixo da Meta' : 'Alerta: Sem Aportes') : (status === 'danger' ? 'Alerta Crítico' : status === 'warning' ? 'Atenção ao Teto' : 'Controle Excelente')}
                   </span>
                 </div>
                 
