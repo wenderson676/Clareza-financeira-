@@ -10,9 +10,10 @@ interface TransactionModalProps {
   onClose: () => void;
   onSave: (t: Omit<Transaction, 'id'>) => void;
   editingTransaction?: Transaction | null;
+  initialTab?: 'expense' | 'income' | 'transfer';
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab }: TransactionModalProps) {
   const [formTab, setFormTab] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [transferDirection, setTransferDirection] = useState<'to_savings' | 'from_savings'>('to_savings');
   const [amount, setAmount] = useState('');
@@ -38,7 +39,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
           setFormTab('transfer');
           setTransferDirection(editingTransaction.type === 'transfer_to_savings' ? 'to_savings' : 'from_savings');
         } else {
-          setFormTab('expense');
+          setFormTab(initialTab || 'expense');
           setBucket(editingTransaction.bucket);
           setCategory(editingTransaction.category);
         }
@@ -46,7 +47,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
         resetForm();
       }
     }
-  }, [isOpen, editingTransaction]);
+  }, [isOpen, editingTransaction, initialTab]);
 
   // Effect to auto-check "isPending" if date is in the future
   useEffect(() => {
@@ -64,15 +65,16 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
   }, [date, editingTransaction]);
 
   const resetForm = () => {
-    setAmount('');
-    setDescription('');
-    setCategory('');
-    setBucket('Necessidades');
-    setFormTab('expense');
+    setAmount("");
+    setDescription("");
+    setCategory("");
+    setBucket(initialTab === "income" ? "Renda" : "Necessidades");
+    setFormTab(initialTab || "expense");
     setIsPending(false);
-    setTransferDirection('to_savings');
-    setDate(format(new Date(), 'yyyy-MM-dd'));
+    setTransferDirection("to_savings");
+    setDate(format(new Date(), "yyyy-MM-dd"));
   };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +150,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction }
               <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <button
                   type="button"
-                  onClick={() => { setFormTab('expense'); setCategory(''); }}
+                  onClick={() => { setFormTab(initialTab || 'expense'); setCategory(''); }}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                     formTab === 'expense' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-100' : 'text-slate-500 dark:text-slate-400'
                   }`}

@@ -14,6 +14,7 @@ interface DashboardProps {
   allData: Record<string, MonthlyData>;
   goals?: Goal[];
   addGoal?: (goal: Omit<Goal, 'id'>) => void;
+  onOpenGoalForm?: (goal?: Goal) => void;
   updateGoal?: (id: string, goal: Partial<Goal>) => void;
   deleteGoal?: (id: string) => void;
   debts?: Debt[];
@@ -31,7 +32,8 @@ export function Dashboard({
   previousBalance, 
   allData, 
   goals = [], 
-  addGoal, 
+  addGoal,
+  onOpenGoalForm, 
   updateGoal, 
   deleteGoal, 
   debts = [],
@@ -45,9 +47,6 @@ export function Dashboard({
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
-  const [showGoalForm, setShowGoalForm] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [goalForm, setGoalForm] = useState({ title: '', targetAmount: '', currentAmount: '' });
   
   const [note, setNote] = useState(data.devotionalNote || '');
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -732,10 +731,10 @@ export function Dashboard({
         </h2>
         <button 
           onClick={() => {
-            setGoalForm({ title: '', targetAmount: '', currentAmount: '' });
-            setEditingGoal(null);
-            setShowGoalForm(true);
+            if (onOpenGoalForm) onOpenGoalForm();
           }}
+          className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+
           className="text-xs bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
         >
           <Plus size={14} /> Nova Meta
@@ -778,13 +777,7 @@ export function Dashboard({
                   <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button 
                       onClick={() => {
-                        setGoalForm({ 
-                          title: goal.title, 
-                          targetAmount: goal.targetAmount.toString(), 
-                          currentAmount: goal.currentAmount.toString() 
-                        });
-                        setEditingGoal(goal);
-                        setShowGoalForm(true);
+                        if (onOpenGoalForm) onOpenGoalForm(goal);
                       }}
                       className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors"
                     >
@@ -1102,94 +1095,6 @@ export function Dashboard({
           </motion.div>
         )}
 
-        {showGoalForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 pb-0 sm:pb-4"
-            onClick={() => setShowGoalForm(false)}
-          >
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-10">
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <Target className="text-indigo-500" size={24} />
-                  {editingGoal ? 'Editar Meta' : 'Nova Meta'}
-                </h3>
-                <button onClick={() => setShowGoalForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="p-6 overflow-y-auto">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">O que você quer conquistar?</label>
-                    <input 
-                      type="text" 
-                      value={goalForm.title}
-                      onChange={e => setGoalForm({...goalForm, title: e.target.value})}
-                      placeholder="Ex: Reserva de Emergência, Viagem..."
-                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qual o valor total necessário?</label>
-                    <input 
-                      type="number" 
-                      value={goalForm.targetAmount}
-                      onChange={e => setGoalForm({...goalForm, targetAmount: e.target.value})}
-                      placeholder="R$ 0,00"
-                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quanto você já tem guardado?</label>
-                    <input 
-                      type="number" 
-                      value={goalForm.currentAmount}
-                      onChange={e => setGoalForm({...goalForm, currentAmount: e.target.value})}
-                      placeholder="R$ 0,00"
-                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                
-                <button
-                  onClick={() => {
-                    if (goalForm.title && goalForm.targetAmount) {
-                      if (editingGoal && updateGoal) {
-                        updateGoal(editingGoal.id, {
-                          title: goalForm.title,
-                          targetAmount: Number(goalForm.targetAmount),
-                          currentAmount: Number(goalForm.currentAmount || 0)
-                        });
-                      } else if (addGoal) {
-                        addGoal({
-                          title: goalForm.title,
-                          targetAmount: Number(goalForm.targetAmount),
-                          currentAmount: Number(goalForm.currentAmount || 0)
-                        });
-                      }
-                      setShowGoalForm(false);
-                    }
-                  }}
-                  disabled={!goalForm.title || !goalForm.targetAmount}
-                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl py-4 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <CheckCircle2 size={20} />
-                  {editingGoal ? 'Salvar Alterações' : 'Criar Meta'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
       </AnimatePresence>
     </div>
   );
