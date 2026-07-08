@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2 } from 'lucide-react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, Sparkles } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Comparison } from './components/Comparison';
 import { Planning } from './components/Planning';
 import { TransactionModal } from './components/TransactionModal';
+import { CopilotChat } from './components/CopilotChat';
 import { useStore } from './lib/store';
 import { format, addMonths, subMonths, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,8 +50,9 @@ export default function App() {
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [tempUserName, setTempUserName] = useState('');
   const [showWelcomeModal, setShowWelcomeModal] = useState(() => !state.userName);
-  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingStep, setOnboardingStep] = useState(0);
   const [selectedBudgetMode, setSelectedBudgetMode] = useState<BudgetMode>('50-30-20');
+  const [showAINotification, setShowAINotification] = useState(false);
   
   const handleExportData = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -122,6 +124,7 @@ export default function App() {
 
   const confirmResetData = () => {
     resetStore();
+    window.dispatchEvent(new Event('clear_copilot_messages'));
     setShowResetConfirm(false);
     setIsSidebarOpen(false);
     setCurrentMonthDate(new Date());
@@ -337,7 +340,26 @@ export default function App() {
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl max-w-md w-full border border-slate-100 dark:border-slate-800 text-center max-h-[90vh] overflow-y-auto"
               >
-                {onboardingStep === 1 ? (
+                {onboardingStep === 0 ? (
+                  <>
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Lightbulb size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Versão de Teste (Alpha)</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm leading-relaxed">
+                      Este aplicativo está em fase de testes! 🚀<br /><br />
+                      Ele ajuda você a organizar seu dinheiro dividindo suas despesas em <strong>Necessidades</strong>, <strong>Desejos</strong> e <strong>Reserva/Dívidas</strong> de acordo com o modo escolhido.<br /><br />
+                      Você pode registrar gastos manualmente ou pedir ajuda à nossa <strong>Inteligência Artificial</strong> (Copiloto) para analisar suas finanças e fazer registros por você.
+                    </p>
+                    <button
+                      onClick={() => setOnboardingStep(1)}
+                      className="w-full py-3.5 px-4 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors text-base flex justify-center items-center gap-2 shadow-lg shadow-blue-200 dark:shadow-blue-900/10"
+                    >
+                      Entendi, vamos lá!
+                      <ChevronRight size={18} />
+                    </button>
+                  </>
+                ) : onboardingStep === 1 ? (
                   <>
                     <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Home size={32} />
@@ -412,6 +434,7 @@ export default function App() {
                             setUserName(tempUserName.trim());
                             setBudgetMode(selectedBudgetMode);
                             setShowWelcomeModal(false);
+                            setShowAINotification(true);
                           }
                         }}
                         className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium transition-colors text-sm shadow-lg shadow-emerald-200 dark:shadow-emerald-900/10"
@@ -422,6 +445,47 @@ export default function App() {
                   </>
                 )}
               </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* AI Notification Post-Onboarding */}
+        <AnimatePresence>
+          {showAINotification && (
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              className="fixed bottom-28 left-4 right-4 sm:left-auto sm:right-6 sm:w-80 z-50 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-100 dark:border-slate-800"
+            >
+              <div className="flex items-start gap-3 relative">
+                <button 
+                  onClick={() => setShowAINotification(false)}
+                  className="absolute -top-1 -right-1 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X size={16} />
+                </button>
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <Sparkles size={20} className="animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm mb-1">Análise Inteligente</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+                    Você pode pedir ao nosso Copiloto para fazer uma análise da sua vida financeira e sugerir o melhor modo de divisão para as suas metas!
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setShowAINotification(false);
+                      const chatBtn = document.querySelector('[aria-label="Abrir Copiloto Clareza"]') as HTMLButtonElement;
+                      if (chatBtn) chatBtn.click();
+                      window.dispatchEvent(new Event('start_financial_analysis'));
+                    }}
+                    className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
+                  >
+                    Experimentar agora
+                  </button>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -472,6 +536,16 @@ export default function App() {
           onClose={() => setIsModalOpen(false)}
           onSave={handleSaveTransaction}
           editingTransaction={editingTransaction}
+        />
+
+        <CopilotChat
+          monthId={monthId}
+          state={state}
+          addTransaction={addTransaction}
+          addDebt={addDebt}
+          addGoal={addGoal}
+          setBudgetMode={setBudgetMode}
+          setUserName={setUserName}
         />
 
         {/* Bottom Navigation */}
