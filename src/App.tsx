@@ -488,6 +488,9 @@ export default function App() {
               data={monthData} 
               previousBalance={getAccumulatedBalance(monthId)} 
               budgetMode={state.budgetMode || '50-30-20'}
+              allData={state.monthlyData}
+              debts={state.debts}
+              goals={state.goals}
             />
           )}
           {currentTab === 'comparison' && (
@@ -545,7 +548,7 @@ export default function App() {
 
           <NavItem 
             icon={<Target size={24} />} 
-            label="Planejamento" 
+            label="Contador" 
             isActive={currentTab === 'planning'} 
             onClick={() => setCurrentTab('planning')} 
           />
