@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical, Wallet, PiggyBank, CreditCard, Coins } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData, Goal, BudgetMode, Debt, AccountType } from '../types';
+import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account } from '../types';
 import { DebtsSection } from './DebtsSection';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
@@ -25,6 +25,10 @@ interface DashboardProps {
   budgetMode?: BudgetMode;
   dashboardCardOrder?: string[];
   setCardOrder?: (order: string[]) => void;
+  accounts?: Account[];
+  addAccount?: (account: Omit<Account, 'id'>) => void;
+  updateAccount?: (id: string, updated: Partial<Account>) => void;
+  deleteAccount?: (id: string) => void;
 }
 
 export function Dashboard({ 
@@ -43,13 +47,68 @@ export function Dashboard({
   onSaveNote, 
   budgetMode = '50-30-20',
   dashboardCardOrder = [],
-  setCardOrder
+  setCardOrder,
+  accounts = [],
+  addAccount,
+  updateAccount,
+  deleteAccount
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
   
   const [note, setNote] = useState(data.devotionalNote || '');
   const [isEditingNote, setIsEditingNote] = useState(false);
+
+  const [isManagingAccounts, setIsManagingAccounts] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+
+  const [accFormName, setAccFormName] = useState('');
+  const [accFormIcon, setAccFormIcon] = useState('🏦');
+  const [accFormIsMain, setAccFormIsMain] = useState(false);
+
+  const handleOpenEditAccount = (acc: Account) => {
+    setEditingAccount(acc);
+    setAccFormName(acc.name);
+    setAccFormIcon(acc.icon);
+    setAccFormIsMain(!!acc.isMain);
+    setShowCreateAccount(false);
+  };
+
+  const handleOpenCreateAccount = () => {
+    setEditingAccount(null);
+    setAccFormName('');
+    setAccFormIcon('💳');
+    setAccFormIsMain(false);
+    setShowCreateAccount(true);
+  };
+
+  const handleCancelForm = () => {
+    setEditingAccount(null);
+    setShowCreateAccount(false);
+  };
+
+  const handleSaveAccountForm = () => {
+    if (!accFormName.trim()) return;
+
+    if (showCreateAccount) {
+      addAccount?.({
+        name: accFormName.trim(),
+        icon: accFormIcon,
+        isMain: accFormIsMain,
+        type: 'custom'
+      });
+    } else if (editingAccount) {
+      updateAccount?.(editingAccount.id, {
+        name: accFormName.trim(),
+        icon: accFormIcon,
+        isMain: accFormIsMain
+      });
+    }
+
+    setEditingAccount(null);
+    setShowCreateAccount(false);
+  };
 
   const modeBuckets = useMemo(() => getBucketsConfig(budgetMode), [budgetMode]);
 
@@ -105,11 +164,13 @@ export function Dashboard({
   const projectedBalance = previousBalance + projectedIncome - projectedExpenses - projectedNetTransfersToSavings;
 
   const accountBalances = useMemo(() => {
-    const balances = {
-      banco: 0,
-      reserva: 0,
-      carteira: 0
-    };
+    const balances: Record<string, number> = {};
+    accounts.forEach(acc => {
+      balances[acc.id] = 0;
+    });
+    if (balances['banco'] === undefined) balances['banco'] = 0;
+    if (balances['reserva'] === undefined) balances['reserva'] = 0;
+    if (balances['carteira'] === undefined) balances['carteira'] = 0;
 
     const sortedMonthIds = Object.keys(allData).sort();
 
@@ -123,7 +184,7 @@ export function Dashboard({
         if (t.isPending) continue;
 
         const amt = t.amount;
-        const act = (t.account || 'banco') as AccountType;
+        const act = t.account || 'banco';
 
         if (t.type === 'income') {
           if (balances[act] !== undefined) {
@@ -161,16 +222,18 @@ export function Dashboard({
             balances['banco'] += amt;
           }
         } else if (t.type === 'transfer_between_accounts') {
-          const fromAct = (t.account || 'banco') as AccountType;
-          const toAct = (t.toAccount || 'carteira') as AccountType;
+          const fromAct = t.account || 'banco';
+          const toAct = t.toAccount || 'carteira';
           if (balances[fromAct] !== undefined) balances[fromAct] -= amt;
+          else balances['banco'] -= amt;
           if (balances[toAct] !== undefined) balances[toAct] += amt;
+          else balances['carteira'] += amt;
         }
       }
     }
 
     return balances;
-  }, [allData, data.monthId]);
+  }, [allData, data.monthId, accounts]);
 
   const raioX = useMemo(() => {
     const savingsRatio = totalIncome > 0 ? (netTransfersToSavings / totalIncome) : 0;
@@ -612,7 +675,7 @@ export function Dashboard({
   );
 
   const renderContas = () => {
-    const totalPatrimonio = accountBalances.banco + accountBalances.reserva + accountBalances.carteira;
+    const totalPatrimonio = accounts.reduce((sum, curr) => sum + (accountBalances[curr.id] || 0), 0);
 
     return (
       <motion.div 
@@ -634,53 +697,54 @@ export function Dashboard({
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Onde estão alocados seus recursos</span>
             </div>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 px-4 py-2 rounded-2xl text-left sm:text-right">
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Patrimônio Total</span>
-            <span className={`text-lg font-black ${totalPatrimonio >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-              {formatCurrency(totalPatrimonio)}
-            </span>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setIsManagingAccounts(true)}
+              className="px-3 py-1.5 text-xs font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-xl transition-colors flex items-center gap-1.5 border border-indigo-100 dark:border-indigo-500/20 cursor-pointer"
+            >
+              <SlidersHorizontal size={13} />
+              Gerenciar Contas
+            </button>
+            
+            <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 px-4 py-2 rounded-2xl text-left sm:text-right">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Patrimônio Total</span>
+              <span className={`text-lg font-black ${totalPatrimonio >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatCurrency(totalPatrimonio)}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Banco */}
-          <div className="p-4 rounded-2xl bg-blue-50/40 dark:bg-blue-500/5 border border-blue-100/50 dark:border-blue-500/10 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <CreditCard size={20} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">🏦 No Banco</span>
-              <span className={`text-base font-bold block truncate ${accountBalances.banco >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-                {formatCurrency(accountBalances.banco)}
-              </span>
-            </div>
-          </div>
-
-          {/* Reserva */}
-          <div className="p-4 rounded-2xl bg-emerald-50/40 dark:bg-emerald-500/5 border border-emerald-100/50 dark:border-emerald-500/10 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <PiggyBank size={20} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">💰 Na Reserva</span>
-              <span className={`text-base font-bold block truncate ${accountBalances.reserva >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-                {formatCurrency(accountBalances.reserva)}
-              </span>
-            </div>
-          </div>
-
-          {/* Carteira */}
-          <div className="p-4 rounded-2xl bg-amber-50/40 dark:bg-amber-500/5 border border-amber-100/50 dark:border-amber-500/10 flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-              <Wallet size={20} />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">💵 Na Carteira</span>
-              <span className={`text-base font-bold block truncate ${accountBalances.carteira >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-                {formatCurrency(accountBalances.carteira)}
-              </span>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {accounts.map(acc => {
+            const bal = accountBalances[acc.id] || 0;
+            return (
+              <div 
+                key={acc.id} 
+                className={`p-4 rounded-2xl bg-slate-50/40 dark:bg-slate-800/10 border ${acc.isMain ? 'border-indigo-200 dark:border-indigo-500/20 bg-indigo-50/10 dark:bg-indigo-500/5' : 'border-slate-100/60 dark:border-slate-800/40'} flex items-center justify-between gap-3 group relative`}
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 font-bold text-xl">
+                    {acc.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1 flex items-center gap-1.5">
+                      {acc.name}
+                      {acc.isMain && (
+                        <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400 px-1.5 py-0.5 rounded-full uppercase whitespace-nowrap">
+                          Principal
+                        </span>
+                      )}
+                    </span>
+                    <span className={`text-base font-bold block truncate ${bal >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(bal)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </motion.div>
     );
@@ -1271,6 +1335,185 @@ export function Dashboard({
                   className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"
                 >
                   Confirmar Layout
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Modal de Gerenciamento de Contas */}
+        {isManagingAccounts && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-end sm:items-center justify-center p-4 sm:p-0"
+            onClick={() => {
+              setIsManagingAccounts(false);
+              handleCancelForm();
+            }}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  🏦 Gerenciar Contas
+                </h3>
+                <button 
+                  onClick={() => {
+                    setIsManagingAccounts(false);
+                    handleCancelForm();
+                  }} 
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                {(editingAccount || showCreateAccount) ? (
+                  <div className="space-y-4 animate-fade-in bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-left">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      {showCreateAccount ? 'Criar Nova Conta' : `Editar Conta: ${editingAccount?.name}`}
+                    </h4>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Nome da Conta</label>
+                      <input
+                        type="text"
+                        required
+                        value={accFormName}
+                        onChange={e => setAccFormName(e.target.value)}
+                        placeholder="Ex: Nubank, Carteira de Investimentos"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 transition-all font-medium text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Ícone / Emoji</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {['🏦', '💰', '💵', '💳', '🐷', '🪙', '📈', '🏠', '💼', '🎒', '⚡', '🚗'].map(emoji => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => setAccFormIcon(emoji)}
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-lg border transition-all ${accFormIcon === emoji ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/20 scale-105' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300'}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Ou digite o seu:</span>
+                        <input
+                          type="text"
+                          maxLength={2}
+                          value={accFormIcon}
+                          onChange={e => setAccFormIcon(e.target.value)}
+                          className="w-12 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-1 px-1.5 outline-none font-medium text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 py-1">
+                      <input
+                        type="checkbox"
+                        id="accFormIsMain"
+                        checked={accFormIsMain}
+                        onChange={e => setAccFormIsMain(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                      />
+                      <label htmlFor="accFormIsMain" className="text-sm text-slate-700 dark:text-slate-300 select-none cursor-pointer font-medium">
+                        Definir como Conta Principal
+                      </label>
+                    </div>
+
+                    <div className="flex gap-2.5 pt-2">
+                      <button
+                        onClick={handleCancelForm}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveAccountForm}
+                        disabled={!accFormName.trim()}
+                        className="flex-1 py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-45 disabled:pointer-events-none transition-colors shadow-sm"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/30 dark:bg-slate-900">
+                      {accounts.map(acc => (
+                        <div key={acc.id} className="p-3.5 flex items-center justify-between gap-3 bg-white dark:bg-slate-900 hover:bg-slate-50/50 dark:hover:bg-slate-800/25 transition-colors text-left">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="text-2xl font-bold">{acc.icon}</span>
+                            <div className="min-w-0">
+                              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 block truncate flex items-center gap-1.5">
+                                {acc.name}
+                                {acc.isMain && (
+                                  <span className="text-[8px] font-black bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 px-1.5 py-0.5 rounded-full uppercase whitespace-nowrap">
+                                    Principal
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {acc.type === 'custom' ? 'Conta Customizada' : 'Conta do Sistema'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => handleOpenEditAccount(acc)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Editar"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            {acc.type === 'custom' && (
+                              <button
+                                onClick={() => deleteAccount && deleteAccount(acc.id)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="Excluir"
+                              >
+                                <Trash size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleOpenCreateAccount}
+                      className="w-full py-3 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-400 hover:bg-indigo-50/10 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 transition-all cursor-pointer"
+                    >
+                      <Plus size={15} />
+                      Criar Nova Conta
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shrink-0 flex justify-end">
+                <button
+                  onClick={() => {
+                    setIsManagingAccounts(false);
+                    handleCancelForm();
+                  }}
+                  className="py-3 px-6 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors cursor-pointer"
+                >
+                  Concluir
                 </button>
               </div>
             </motion.div>

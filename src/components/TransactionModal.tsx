@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { X } from 'lucide-react';
-import { Transaction, TransactionType, Bucket, AccountType } from '../types';
+import { Transaction, TransactionType, Bucket, AccountType, Account } from '../types';
 import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,10 +11,11 @@ interface TransactionModalProps {
   onSave: (t: Omit<Transaction, 'id'>) => void;
   editingTransaction?: Transaction | null;
   initialTab?: 'expense' | 'income' | 'transfer';
-  accountBalances?: { banco: number; reserva: number; carteira: number; };
+  accountBalances?: Record<string, number>;
+  accounts?: Account[];
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab, accountBalances }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab, accountBalances, accounts }: TransactionModalProps) {
   const [formTab, setFormTab] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [transferFrom, setTransferFrom] = useState<AccountType>('banco');
   const [transferTo, setTransferTo] = useState<AccountType>('reserva');
@@ -61,7 +62,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
         resetForm();
       }
     }
-  }, [isOpen, editingTransaction, initialTab]);
+  }, [isOpen, editingTransaction, initialTab, accounts]);
 
   // Effect to auto-check "isPending" if date is in the future
   useEffect(() => {
@@ -85,13 +86,27 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     setBucket(initialTab === "income" ? "Renda" : "Necessidades");
     setFormTab(initialTab || "expense");
     setIsPending(false);
-    setTransferFrom("banco");
-    setTransferTo("reserva");
+    
+    const mainAcc = accounts?.find(a => a.isMain)?.id || "banco";
+    const savingsAcc = accounts?.find(a => a.type === 'reserva')?.id || "reserva";
+    
+    setTransferFrom(mainAcc);
+    setTransferTo(savingsAcc);
     setDate(format(new Date(), "yyyy-MM-dd"));
-    setAccount("banco");
+    setAccount(mainAcc);
     setError("");
   };
 
+
+  const getAccountLabel = (accountId?: string) => {
+    const found = accounts?.find(a => a.id === accountId);
+    if (found) {
+      return `${found.icon} ${found.name}`;
+    }
+    if (accountId === 'reserva') return 'Reserva';
+    if (accountId === 'carteira') return 'Carteira';
+    return 'Banco';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +143,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
       }
 
       if (amountDifference > 0 && amountDifference > availableBalance) {
-        setError(`Saldo insuficiente na conta de origem (${transferFrom}). Saldo disponível: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableBalance)}`);
+        setError(`Saldo insuficiente na conta de origem (${getAccountLabel(transferFrom)}). Saldo disponível: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableBalance)}`);
         return;
       }
     }
@@ -259,24 +274,32 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">De (Origem)</label>
                     <select
                       value={transferFrom}
-                      onChange={e => setTransferFrom(e.target.value as AccountType)}
+                      onChange={e => setTransferFrom(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
-                      <option value="banco">🏦 Banco</option>
-                      <option value="reserva">💰 Reserva (Cofrinho)</option>
-                      <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                      {(accounts && accounts.length > 0 ? accounts : [
+                        { id: 'banco', name: 'Banco', icon: '🏦' },
+                        { id: 'reserva', name: 'Reserva (Cofrinho)', icon: '💰' },
+                        { id: 'carteira', name: 'Carteira (Dinheiro Físico)', icon: '💵' }
+                      ]).map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.icon} {acc.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Para (Destino)</label>
                     <select
                       value={transferTo}
-                      onChange={e => setTransferTo(e.target.value as AccountType)}
+                      onChange={e => setTransferTo(e.target.value)}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                     >
-                      <option value="banco">🏦 Banco</option>
-                      <option value="reserva">💰 Reserva (Cofrinho)</option>
-                      <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                      {(accounts && accounts.length > 0 ? accounts : [
+                        { id: 'banco', name: 'Banco', icon: '🏦' },
+                        { id: 'reserva', name: 'Reserva (Cofrinho)', icon: '💰' },
+                        { id: 'carteira', name: 'Carteira (Dinheiro Físico)', icon: '💵' }
+                      ]).map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.icon} {acc.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -386,9 +409,13 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                     onChange={e => setAccount(e.target.value as AccountType)}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-sm"
                   >
-                    <option value="banco">🏦 Banco</option>
-                    {bucket !== 'Reserva/Dívidas' && <option value="reserva">💰 Reserva (Cofrinho)</option>}
-                    <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                    {(accounts && accounts.length > 0 ? accounts : [
+                      { id: 'banco', name: 'Banco', icon: '🏦' },
+                      { id: 'reserva', name: 'Reserva (Cofrinho)', icon: '💰', type: 'reserva' },
+                      { id: 'carteira', name: 'Carteira (Dinheiro Físico)', icon: '💵' }
+                    ]).filter(acc => bucket !== 'Reserva/Dívidas' || acc.id !== 'reserva').map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.icon} {acc.name}</option>
+                    ))}
                   </select>
                 </div>
               )}

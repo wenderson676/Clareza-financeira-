@@ -1,15 +1,22 @@
 import { useState, useEffect } from 'react';
-import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket, BudgetMode, Debt } from '../types';
+import { AppState, MonthlyData, Transaction, Goal, Asset, Bucket, BudgetMode, Debt, Account } from '../types';
 import { format, subMonths, parse } from 'date-fns';
 
 const STORAGE_KEY = 'mordomia_simples_data';
+
+export const DEFAULT_ACCOUNTS: Account[] = [
+  { id: 'banco', name: 'Banco', icon: '🏦', isMain: true, type: 'banco' },
+  { id: 'reserva', name: 'Reserva (Cofrinho)', icon: '💰', type: 'reserva' },
+  { id: 'carteira', name: 'Carteira (Dinheiro Físico)', icon: '💵', type: 'carteira' }
+];
 
 const defaultState: AppState = {
   monthlyData: {},
   goals: [],
   assets: [],
   debts: [],
-  dashboardCardOrder: []
+  dashboardCardOrder: [],
+  accounts: DEFAULT_ACCOUNTS
 };
 
 export function useStore() {
@@ -17,7 +24,11 @@ export function useStore() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (!parsed.accounts || parsed.accounts.length === 0) {
+          parsed.accounts = DEFAULT_ACCOUNTS;
+        }
+        return parsed;
       } catch (e) {
         console.error('Failed to parse saved state', e);
       }
@@ -72,11 +83,15 @@ export function useStore() {
   };
 
   const getAccountBalancesUpToMonth = (targetMonthId: string) => {
-    const balances = {
-      banco: 0,
-      reserva: 0,
-      carteira: 0
-    };
+    const currentAccounts = state.accounts || DEFAULT_ACCOUNTS;
+    const balances: Record<string, number> = {};
+    
+    currentAccounts.forEach(acc => {
+      balances[acc.id] = 0;
+    });
+    if (balances['banco'] === undefined) balances['banco'] = 0;
+    if (balances['reserva'] === undefined) balances['reserva'] = 0;
+    if (balances['carteira'] === undefined) balances['carteira'] = 0;
 
     const sortedMonthIds = Object.keys(state.monthlyData).sort();
 
@@ -90,7 +105,7 @@ export function useStore() {
         if (t.isPending) continue;
 
         const amt = t.amount;
-        const act = (t.account || 'banco') as 'banco' | 'reserva' | 'carteira';
+        const act = t.account || 'banco';
 
         if (t.type === 'income') {
           if (balances[act] !== undefined) {
@@ -128,10 +143,12 @@ export function useStore() {
             balances['banco'] += amt;
           }
         } else if (t.type === 'transfer_between_accounts') {
-          const fromAct = (t.account || 'banco') as 'banco' | 'reserva' | 'carteira';
-          const toAct = (t.toAccount || 'carteira') as 'banco' | 'reserva' | 'carteira';
+          const fromAct = t.account || 'banco';
+          const toAct = t.toAccount || 'carteira';
           if (balances[fromAct] !== undefined) balances[fromAct] -= amt;
+          else balances['banco'] -= amt;
           if (balances[toAct] !== undefined) balances[toAct] += amt;
+          else balances['carteira'] += amt;
         }
       }
     }
@@ -320,7 +337,64 @@ export function useStore() {
       goals: [],
       assets: [],
       debts: [],
-      dashboardCardOrder: []
+      dashboardCardOrder: [],
+      accounts: DEFAULT_ACCOUNTS
+    });
+  };
+
+  const addAccount = (account: Omit<Account, 'id'>) => {
+    setState(prev => {
+      const currentAccounts = prev.accounts || DEFAULT_ACCOUNTS;
+      const newAccount: Account = {
+        ...account,
+        id: crypto.randomUUID()
+      };
+      const updatedAccounts = currentAccounts.map(acc => {
+        if (newAccount.isMain) {
+          return { ...acc, isMain: false };
+        }
+        return acc;
+      });
+      return {
+        ...prev,
+        accounts: [...updatedAccounts, newAccount]
+      };
+    });
+  };
+
+  const updateAccount = (id: string, updated: Partial<Account>) => {
+    setState(prev => {
+      const currentAccounts = prev.accounts || DEFAULT_ACCOUNTS;
+      const updatedAccounts = currentAccounts.map(acc => {
+        if (acc.id === id) {
+          return { ...acc, ...updated };
+        }
+        if (updated.isMain && acc.id !== id) {
+          return { ...acc, isMain: false };
+        }
+        return acc;
+      });
+      return {
+        ...prev,
+        accounts: updatedAccounts
+      };
+    });
+  };
+
+  const deleteAccount = (id: string) => {
+    setState(prev => {
+      const currentAccounts = prev.accounts || DEFAULT_ACCOUNTS;
+      const accountToDelete = currentAccounts.find(acc => acc.id === id);
+      if (!accountToDelete || accountToDelete.type !== 'custom') return prev;
+
+      const remainingAccounts = currentAccounts.filter(acc => acc.id !== id);
+      if (accountToDelete.isMain && remainingAccounts.length > 0) {
+        remainingAccounts[0].isMain = true;
+      }
+      return {
+        ...prev,
+        accounts: remainingAccounts
+      };
     });
   };
 
@@ -369,6 +443,9 @@ export function useStore() {
     addDebt,
     updateDebt,
     deleteDebt,
+    addAccount,
+    updateAccount,
+    deleteAccount,
     resetStore,
     importState,
     setUserName,

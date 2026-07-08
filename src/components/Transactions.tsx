@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ArrowUpRight, ArrowDownRight, Trash2, ArrowRightLeft, Clock, Pencil, Calendar, Search } from 'lucide-react';
-import { MonthlyData, Transaction } from '../types';
+import { MonthlyData, Transaction, Account } from '../types';
 import { formatCurrency, BUCKETS } from '../lib/utils';
 
 interface TransactionsProps {
@@ -10,10 +10,21 @@ interface TransactionsProps {
   onEdit: (t: Transaction) => void;
   onDelete: (id: string) => void;
   onTogglePending: (id: string) => void;
+  accounts?: Account[];
 }
 
-export function Transactions({ data, onEdit, onDelete, onTogglePending }: TransactionsProps) {
+export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts }: TransactionsProps) {
   const [searchTerm, setSearchTerm] = useState('');
+
+  const getAccountLabel = (accountId?: string) => {
+    const found = accounts?.find(a => a.id === accountId);
+    if (found) {
+      return `${found.icon} ${found.name}`;
+    }
+    if (accountId === 'reserva') return '💰 Reserva';
+    if (accountId === 'carteira') return '💵 Carteira';
+    return '🏦 Banco';
+  };
 
   const groupedTransactions = useMemo(() => {
     let filteredTransactions = data.transactions;
@@ -122,7 +133,13 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
                               <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md truncate">{t.category}</span>
                               <span className="text-slate-300 dark:text-slate-700">•</span>
                               <span className="px-2 py-1 bg-indigo-50/60 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-md text-[11px]">
-                                {t.account === 'reserva' ? '💰 Reserva' : t.account === 'carteira' ? '💵 Carteira' : '🏦 Banco'}
+                                {t.type === 'transfer_between_accounts' || t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' ? (
+                                  <span>
+                                    {getAccountLabel(t.account)} ➔ {getAccountLabel(t.toAccount || (t.type === 'transfer_to_savings' ? 'reserva' : 'banco'))}
+                                  </span>
+                                ) : (
+                                  getAccountLabel(t.account)
+                                )}
                               </span>
                               {t.type === 'expense' && (
                                 <>
