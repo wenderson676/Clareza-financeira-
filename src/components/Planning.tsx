@@ -1,366 +1,374 @@
 import React, { useMemo } from 'react';
-import { MonthlyData, BudgetMode, Debt, Goal } from '../types';
+import { MonthlyData, BudgetMode } from '../types';
 import { getBucketsConfig, formatCurrency } from '../lib/utils';
-import { BrainCircuit, AlertTriangle, TrendingUp, CheckCircle2, FileText, ArrowRight, ShieldAlert, Zap, Target, ArrowUpCircle } from 'lucide-react';
+import { Target, TrendingUp, AlertTriangle, CheckCircle2, Compass, Activity, ArrowRight, BrainCircuit, BarChart4 } from 'lucide-react';
 
 interface PlanningProps {
   data: MonthlyData;
   previousBalance: number;
   budgetMode?: BudgetMode;
-  allData?: Record<string, MonthlyData>;
-  debts?: Debt[];
-  goals?: Goal[];
 }
 
-interface AccountantAdvice {
+interface StrategyItem {
   id: string;
   type: 'danger' | 'warning' | 'success' | 'info';
   title: string;
-  problem: string;
-  solution: string;
-  action: string;
+  description: string;
+  actionable: string;
 }
 
-export function Planning({ data, previousBalance, budgetMode = '50-30-20', allData, debts = [], goals = [] }: PlanningProps) {
+export function Planning({ data, previousBalance, budgetMode = '50-30-20' }: PlanningProps) {
   const txs = data.transactions;
   const modeBuckets = useMemo(() => getBucketsConfig(budgetMode) as Record<string, { percentage: number; color: string; text: string }>, [budgetMode]);
 
+  // Calculando valores realizados e pendentes
   const realizedIncome = txs.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
   const realizedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const totalProjectedIncome = txs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const totalProjectedExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas').reduce((sum, t) => sum + t.amount, 0);
+  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const realizedSavingsWithdraw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const netRealizedSavings = realizedSavings - realizedSavingsWithdraw;
 
-  const realizedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
-  const totalProjectedSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas'))).reduce((sum, t) => sum + t.amount, 0);
+  const pendingIncome = txs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingExpenses = txs.filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingSavings = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+  const pendingSavingsWithdraw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && t.isPending).reduce((sum, t) => sum + t.amount, 0);
 
-  const getSpentByBucket = (bucketName: string, includePending: boolean) => {
-    return txs.filter(t => {
-      if (!includePending && t.isPending) return false;
-      if (bucketName === 'Reserva/Dívidas') {
-        return t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas');
-      }
-      return t.type === 'expense' && t.bucket === bucketName;
-    }).reduce((sum, t) => sum + t.amount, 0);
+  const currentBalance = previousBalance + realizedIncome - realizedExpenses - netRealizedSavings;
+  const totalProjectedIncome = realizedIncome + pendingIncome;
+  const projectedBalance = currentBalance + pendingIncome - pendingExpenses - pendingSavings + pendingSavingsWithdraw;
+
+  const getSpentByBucket = (bucket: string, includePending: boolean) => {
+    if (bucket === 'Reserva/Dívidas') {
+      const rs = txs.filter(t => (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
+      const rw = txs.filter(t => (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) && (includePending ? true : !t.isPending)).reduce((sum, t) => sum + t.amount, 0);
+      return rs - rw;
+    }
+    return txs
+      .filter(t => t.type === 'expense' && t.bucket === bucket && (includePending ? true : !t.isPending))
+      .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  const getStatus = (spent: number, allocated: number, isSavings: boolean) => {
-    if (isSavings) {
-      if (allocated === 0) return 'success';
-      const ratio = spent / allocated;
-      if (ratio >= 1) return 'success';
-      if (ratio >= 0.5) return 'warning';
-      return 'danger';
+  const getCategoryTotals = (bucket: string, includePending: boolean) => {
+    const cats: Record<string, number> = {};
+    if (bucket === 'Reserva/Dívidas') {
+      txs.filter(t => (t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || t.type === 'transfer_between_accounts' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas')) && (includePending ? true : !t.isPending))
+         .forEach(t => {
+           const isAdd = t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva');
+           const val = isAdd ? t.amount : -t.amount;
+           cats[t.category] = (cats[t.category] || 0) + val;
+         });
+    } else {
+      txs.filter(t => t.type === 'expense' && t.bucket === bucket && (includePending ? true : !t.isPending))
+         .forEach(t => {
+           cats[t.category] = (cats[t.category] || 0) + t.amount;
+         });
     }
-    if (allocated === 0) return spent > 0 ? 'danger' : 'success';
-    const ratio = spent / allocated;
-    if (ratio >= 1) return 'danger';
-    if (ratio >= 0.85) return 'warning';
-    return 'success';
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]);
   };
 
-  const advices = useMemo(() => {
-    const items: AccountantAdvice[] = [];
-    
-    // 1. Check past vs current month
-    if (allData) {
-      const allMonths = Object.keys(allData).sort();
-      const currentMonthIndex = allMonths.indexOf(data.monthId);
-      if (currentMonthIndex > 0) {
-        const prevMonthId = allMonths[currentMonthIndex - 1];
-        const prevData = allData[prevMonthId];
-        const prevExpenses = prevData.transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-        const currentExpenses = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-        
-        if (currentExpenses > prevExpenses * 1.2 && prevExpenses > 0) {
-          items.push({
-            id: 'spending-spike',
-            type: 'warning',
-            title: 'Alerta de Inflação de Estilo de Vida',
-            problem: `Seus gastos totais projetados este mês (${formatCurrency(currentExpenses)}) cresceram mais de 20% em relação ao mês anterior (${formatCurrency(prevExpenses)}).`,
-            solution: 'Cuidado para não estar inflando seu padrão de vida acompanhando alguma alta de renda. Gastos não podem subir mais rápido que sua receita.',
-            action: 'Use a aba de Histórico e analise friamente quais categorias puxaram esse aumento e corte excessos imediatos.'
-          });
-        }
-      }
+  const isNegative = currentBalance < 0;
+
+  const strategies = useMemo(() => {
+    const strat: StrategyItem[] = [];
+    if (totalProjectedIncome === 0) {
+      strat.push({
+        id: 'no-income',
+        type: 'info',
+        title: 'Vamos começar a organizar!',
+        description: 'Parece que ainda não temos nenhuma renda registrada (recebida ou a receber) para este mês.',
+        actionable: 'Sugestão: Registre o seu salário ou outras rendas esperadas para que possamos fazer um planejamento financeiro completo para você.'
+      });
+      return strat;
     }
 
-    // 2. Check Deficit
-    const totalAvailable = previousBalance + totalProjectedIncome;
-    if (totalProjectedExpenses > totalProjectedIncome && totalProjectedIncome > 0) {
-      if (totalProjectedExpenses > totalAvailable) {
-        items.push({
-          id: 'deficit-critical',
-          type: 'danger',
-          title: 'Risco Crítico de Insolvência',
-          problem: `Suas despesas projetadas (${formatCurrency(totalProjectedExpenses)}) ultrapassam todo seu saldo disponível e renda (${formatCurrency(totalAvailable)}). Você está fabricando dívidas ativamente.`,
-          solution: 'Situações extremas exigem medidas extremas. Cancele qualquer assinatura, saída ou compra de desejos IMEDIATAMENTE.',
-          action: 'Avalie mudar seu modo de orçamento para 70-0-30 (Modo Sobrevivência) até recuperar o controle do seu fluxo de caixa.'
-        });
+    // 1. Risco de Déficit Projetado (Falta de Dinheiro)
+    if (projectedBalance < 0) {
+      const pendingExpensesList = txs.filter(t => t.type === 'expense' && t.isPending).sort((a, b) => b.amount - a.amount);
+      
+      let actionable = '';
+      if (pendingExpensesList.length > 0) {
+        actionable = `Sugestão de Contador: Você tem despesas futuras cadastradas (como "${pendingExpensesList[0].description}" no valor de ${formatCurrency(pendingExpensesList[0].amount)}). Para não fechar o mês no vermelho, reavalie imediatamente se é possível cancelar ou adiar essas compras que ainda não foram pagas.`;
       } else {
-        items.push({
-          id: 'deficit-warning',
+        // Encontra a área com maior excesso
+        let worstBucket = '';
+        let maxOver = 0;
+        Object.entries(modeBuckets).forEach(([b, conf]) => {
+          const config = conf as { percentage: number; color: string; text: string };
+          const spent = getSpentByBucket(b, true);
+          const allocated = totalProjectedIncome * config.percentage;
+          if (spent - allocated > maxOver) {
+            maxOver = spent - allocated;
+            worstBucket = b;
+          }
+        });
+        
+        const topCat = worstBucket ? getCategoryTotals(worstBucket, false)[0] : null;
+        
+        actionable = topCat 
+          ? `Sugestão de Contador: O maior desvio do orçamento até agora ocorreu na categoria "${worstBucket}", com os gastos puxados por "${topCat[0]}". Tente não gastar mais nessa área e, se possível, busque uma renda extra para equilibrar as contas.` 
+          : `Sugestão de Contador: Os gastos que você já realizou ou registrou ultrapassaram sua renda prevista. A recomendação profissional imediata é pausar qualquer novo gasto que não seja vital.`;
+      }
+
+      strat.push({
+        id: 'deficit',
+        type: 'danger',
+        title: 'Alerta: Previsão de Falta de Dinheiro',
+        description: `Com base na sua renda atual e no que ainda vai receber (${formatCurrency(pendingIncome)}), somado aos gastos já feitos e contas futuras a pagar, a estimativa é que falte ${formatCurrency(Math.abs(projectedBalance))} no final do mês.`,
+        actionable
+      });
+    }
+
+    // 2. Alerta de Fluxo de Caixa (Descompasso de Datas)
+    if (projectedBalance >= 0 && currentBalance < pendingExpenses && pendingIncome > 0) {
+      strat.push({
+        id: 'cashflow',
+        type: 'warning',
+        title: 'Atenção ao Fluxo de Caixa (Datas)',
+        description: `Você tem ${formatCurrency(currentBalance)} disponíveis no caixa hoje, mas cadastrou ${formatCurrency(pendingExpenses)} em contas que ainda vão vencer. A conta só fechará no azul quando a renda futura prevista de ${formatCurrency(pendingIncome)} for efetivamente recebida.`,
+        actionable: `Sugestão de Contador: Certifique-se de que a renda futura vai cair na conta ANTES do vencimento das próximas contas. Caso contrário, negocie o adiamento das contas com os credores para evitar juros.`
+      });
+    }
+
+    // 3. Análise Dinâmica para Otimização
+    const vidaCategories = getCategoryTotals('Desejos', true);
+    const vidaTotalRealized = getSpentByBucket('Desejos', false);
+    const vidaTotalPending = getSpentByBucket('Desejos', true) - vidaTotalRealized;
+    const vidaTotal = vidaTotalRealized + vidaTotalPending;
+    
+    if (vidaTotal > (totalProjectedIncome * modeBuckets['Desejos'].percentage)) {
+      if (vidaCategories.length > 0) {
+        const biggestDrain = vidaCategories[0];
+        const drainPercent = (biggestDrain[1] / vidaTotal) * 100;
+        const overAmount = vidaTotal - (totalProjectedIncome * modeBuckets['Desejos'].percentage);
+        
+        strat.push({
+          id: 'pareto-vida',
           type: 'warning',
-          title: 'Queima de Patrimônio (Burn Rate)',
-          problem: `Suas despesas projetadas (${formatCurrency(totalProjectedExpenses)}) ultrapassam sua renda do mês (${formatCurrency(totalProjectedIncome)}), forçando você a queimar o seu caixa acumulado.`,
-          solution: 'Caixa guardado deve ser usado estrategicamente para investimentos ou emergências reais, não para financiar custo de vida excedente.',
-          action: 'Reduza drasticamente os gastos no balde de Desejos neste mês e avalie fazer uma renda extra urgente (Side Hustle).'
+          title: 'Desejos consumindo acima do limite',
+          description: `Os gastos (pagos + futuros) com "Desejos" (lazer, supérfluos) já somam ${formatCurrency(vidaTotal)} e estouram o teto ideal de ${(modeBuckets['Desejos'].percentage * 100).toFixed(0)}% em ${formatCurrency(overAmount)}. Cerca de ${drainPercent.toFixed(0)}% deste valor está concentrado em "${biggestDrain[0]}".`,
+          actionable: `Sugestão de Contador: Para voltar aos trilhos sem dor, corte ou reduza drasticamente as próximas despesas com "${biggestDrain[0]}". Se houverem despesas futuras pendentes nessa categoria, tente cancelá-las.`
         });
       }
     }
 
-    // 3. Needs & Wants Breakdown
-    const allocatedNeeds = totalProjectedIncome * (modeBuckets['Necessidades']?.percentage || 0);
-    const spentNeeds = getSpentByBucket('Necessidades', true);
-    const allocatedWants = totalProjectedIncome * (modeBuckets['Desejos']?.percentage || 0);
-    const spentWants = getSpentByBucket('Desejos', true);
+    // 4. Análise de Custo Fixo
+    const necessidadesRealized = getSpentByBucket('Necessidades', false);
+    const necessidadesPending = getSpentByBucket('Necessidades', true) - necessidadesRealized;
+    const necessidadesTotal = necessidadesRealized + necessidadesPending;
+    const necessidadesLimit = totalProjectedIncome * modeBuckets['Necessidades'].percentage;
     
-    if (allocatedNeeds > 0 && spentNeeds < allocatedNeeds * 0.8 && spentWants <= allocatedWants) {
-      const remainingNeeds = allocatedNeeds - spentNeeds;
-      items.push({
-        id: 'maximize-aporte-needs',
-        type: 'success',
-        title: 'Oportunidade de Ouro: Turbinar APK (Aporte)',
-        problem: `Você conseguiu manter suas despesas essenciais (${formatCurrency(spentNeeds)}) incrivelmente abaixo do teto orçamentário. Isso gera uma margem ociosa de ${formatCurrency(remainingNeeds)}.`,
-        solution: 'O maior erro é pegar essa "sobra" e gastar com desejos. Transforme esse excelente controle de custos em crescimento de patrimônio.',
-        action: `Use o botão de Adicionar e transfira esses ${formatCurrency(remainingNeeds)} extras diretamente para a Reserva/Investimentos agora mesmo.`
-      });
+    if (necessidadesTotal > necessidadesLimit) {
+       const overAmount = necessidadesTotal - necessidadesLimit;
+       strat.push({
+         id: `bucket-necessidades-high`,
+         type: 'warning',
+         title: `Custo de Vida Básico Elevado`,
+         description: `Seus custos de vida essenciais (já pagos: ${formatCurrency(necessidadesRealized)} | a pagar: ${formatCurrency(necessidadesPending)}) comprometem mais de ${(modeBuckets['Necessidades'].percentage * 100).toFixed(0)}% da sua renda total projetada, excedendo o limite saudável em ${formatCurrency(overAmount)}.`,
+         actionable: `Sugestão de Contador: Custos fixos altos deixam você sem margem de manobra. Avalie suas contas futures e veja se pode renegociar contratos (aluguel, internet) ou mudar hábitos de consumo no supermercado.`
+       });
     }
 
-    if (allocatedWants > 0 && spentWants > allocatedWants) {
-      items.push({
-        id: 'high-wants',
-        type: 'warning',
-        title: 'Fuga de Capital (Estilo de Vida)',
-        problem: `Você já estourou o teto de gastos com Estilo de Vida e Desejos (${formatCurrency(spentWants)} de ${formatCurrency(allocatedWants)}). Esse é o principal ralo financeiro que impede enriquecimento.`,
-        solution: 'Você precisa frear o consumo impulsivo. Pare de pedir delivery e adie a compra de qualquer coisa que não seja essencial para viver.',
-        action: 'Implemente um "No Spend Challenge" (Desafio de Não Gastar) até o último dia do mês nas categorias de Lazer.'
-      });
-    }
-
-    // 4. Savings / APK (Aportes) Target
-    const allocatedSavings = totalProjectedIncome * (modeBuckets['Reserva/Dívidas']?.percentage || 0);
-    if (totalProjectedIncome > 0 && totalProjectedSavings < allocatedSavings) {
-      items.push({
-        id: 'low-savings',
-        type: 'warning',
-        title: 'Taxa de Aporte Insuficiente',
-        problem: `A matemática da riqueza exige ${formatCurrency(allocatedSavings)} de aporte, mas você só aportou ${formatCurrency(totalProjectedSavings)}. O preço no futuro será caro.`,
-        solution: 'A regra de ouro é "Pague a si mesmo primeiro". Você não deve esperar sobrar no fim do mês para aportar.',
-        action: 'Lance agora mesmo uma transação de Transferência no valor de Aporte que falta e ajuste sua vida ao que sobrar.'
-      });
-    } else if (totalProjectedIncome > 0 && totalProjectedSavings >= allocatedSavings * 1.5 && allocatedSavings > 0) {
-      items.push({
-        id: 'super-aporte',
-        type: 'success',
-        title: 'Super Aporte (Nível Elite)',
-        problem: `Seu ritmo de aporte (APK de ${formatCurrency(totalProjectedSavings)}) está esmagando a meta estabelecida (${formatCurrency(allocatedSavings)}). Você está acelerando fortemente sua liberdade.`,
-        solution: 'Neste nível, deixar o dinheiro na Poupança é queimar poder de compra para a inflação. Você precisa rentabilizar melhor esse capital.',
-        action: 'Comece a estudar sobre diversificação (Tesouro Selic/IPCA+, CDBs 100%+ CDI, ou FIIs/Ações) para alocar seus Aportes e usar os juros compostos a seu favor.'
-      });
-    }
-
-    // 5. Debts Analysis
-    const lateDebts = debts.filter(d => d.isLate);
-    const activeDebts = debts.filter(d => !d.isLate);
+    // 5. Planejamento de Crescimento (Reserva Financeira)
+    const currentSavRealized = getSpentByBucket('Reserva/Dívidas', false);
+    const currentSavPending = getSpentByBucket('Reserva/Dívidas', true) - currentSavRealized;
+    const currentSavTotal = currentSavRealized + currentSavPending;
+    const idealSavings = totalProjectedIncome * modeBuckets['Reserva/Dívidas'].percentage;
     
-    if (lateDebts.length > 0) {
-      const totalLate = lateDebts.reduce((sum, d) => sum + d.monthlyPayment, 0);
-      items.push({
-        id: 'late-debts',
-        type: 'danger',
-        title: 'Hemorragia Financeira Severa (Atrasos)',
-        problem: `Você possui ${lateDebts.length} dívida(s) em atraso totalizando parcelas de ${formatCurrency(totalLate)}. Juros de atraso (Rotativo/Cheque Especial) são destrutivos e corroem riqueza rapidamente.`,
-        solution: 'Abandone completamente os gastos de Desejos temporariamente. A sua prioridade número um é estancar os juros dessas contas.',
-        action: 'Ligue para os credores, tente parcelar ou consolidar a dívida para congelar a incidência de juros compostos altíssimos.'
-      });
-    } else if (activeDebts.length > 0 && totalProjectedSavings > 0) {
-       items.push({
-        id: 'debt-snowball',
+    if (currentSavTotal < idealSavings && projectedBalance > 0) {
+      const missingSavings = idealSavings - currentSavTotal;
+      strat.push({
+        id: `savings-growth`,
         type: 'info',
-        title: 'Otimização: Método Bola de Neve',
-        problem: 'Pagar apenas o valor mínimo das suas dívidas ativas te mantém preso ao sistema financeiro por mais tempo pagando juros abusivos.',
-        solution: `Você já alocou ${formatCurrency(totalProjectedSavings)} na categoria de Reserva/Dívidas neste mês. Use esse poder de fogo com inteligência.`,
-        action: 'Aplique todo o valor excedente de aporte diretamente para AMORTIZAR (diminuir o saldo principal) da sua menor dívida ativa, destruindo-a mais rápido.'
+        title: 'Oportunidade para Aumentar a Reserva',
+        description: `Você separou ${formatCurrency(currentSavRealized)} já transferidos (mais ${formatCurrency(currentSavPending)} planejados) para economia ou pagamento de dívidas. O alvo ideal para o seu salário seria no mínimo ${formatCurrency(idealSavings)}. Como há uma sobra projetada no seu caixa, podemos melhorar isso!`,
+        actionable: projectedBalance >= missingSavings 
+          ? `Sugestão de Contador: Registre agora uma transferência futura de ${formatCurrency(missingSavings)} para a sua poupança ou investimentos. Acostume-se a investir a diferença antes de gastar com outras coisas.` 
+          : `Sugestão de Contador: A previsão é sobrar cerca de ${formatCurrency(projectedBalance)} após o pagamento de tudo. Planeje alocar todo esse saldo diretamente para a poupança.`
       });
     }
 
-    // 6. Income Dependency Risk
-    const incomeSources = txs.filter(t => t.type === 'income' && !t.isPending);
-    const uniqueIncomeSources = new Set(incomeSources.map(t => t.description.toLowerCase().trim())).size;
-    if (totalProjectedIncome > 0 && uniqueIncomeSources === 1 && incomeSources.length === 1) {
-       items.push({
-        id: 'income-dependency',
-        type: 'info',
-        title: 'Alerta de Fonte Única de Renda',
-        problem: '100% da sua capacidade de sobrevivência hoje depende de apenas uma fonte. Se algo acontecer com ela, seu sistema quebra (Alta Fragilidade).',
-        solution: 'Para enriquecer de verdade e ter segurança mental (Paz), você precisa criar sistemas paralelos de geração de valor.',
-        action: 'Use seu tempo livre para tentar vender um serviço, iniciar um Side Hustle (bico estratégico) ou investir em ativos geradores de dividendos.'
-      });
-    }
-
-    // 7. Goals Motivation
-    if (goals.length > 0 && totalProjectedSavings > 0) {
-      items.push({
-        id: 'goals-progress',
+    // 6. Sucesso
+    if (!strat.some(s => s.type === 'danger' || s.type === 'warning') && totalProjectedIncome > 0) {
+      strat.push({
+        id: 'success',
         type: 'success',
-        title: 'Capital Direcionado a Sonhos',
-        problem: 'O Aporte pelo Aporte pode causar fadiga orçamentária e te fazer desistir. O dinheiro poupado precisa de um Propósito.',
-        solution: `Você tem ${formatCurrency(totalProjectedSavings)} sendo aportados este mês. Isso significa que você está ativamente comprando partes dos seus sonhos.`,
-        action: 'Mantenha a consistência diária. Vá até a tela do Dashboard e adicione o valor que você aportou direto no progresso das suas Metas.'
+        title: 'Excelente Saúde Financeira!',
+        description: 'Meus parabéns! Analisando seus números, suas contas estão equilibradas. Seus gastos essenciais e estilo de vida estão dentro do planejado e o seu dinheiro está sendo bem direcionado.',
+        actionable: 'Sugestão de Contador: Continue com esse excelente controle! O próximo passo é estudar sobre investimentos para fazer o dinheiro poupado render ainda mais.'
       });
     }
 
-    // 8. Mastery
-    if (items.filter(i => i.type === 'danger' || i.type === 'warning').length === 0 && totalProjectedIncome > 0 && totalProjectedSavings >= allocatedSavings) {
-      items.push({
-        id: 'healthy',
-        type: 'success',
-        title: 'Domínio do Orçamento',
-        problem: 'A maior dificuldade não é chegar no ponto de equilíbrio financeiro, mas manter a consistência brutal nele ano após ano.',
-        solution: 'Seus gastos essenciais e desejos estão contidos perfeitamente dentro dos tetos do modelo, e o Aporte (APK) foi garantido.',
-        action: 'Se a situação está confortável, desafie-se: Que tal reduzir os Desejos em 5% no próximo mês para aumentar seu percentual de Aporte e ser livre mais rápido?'
-      });
-    }
+    return strat;
+  }, [txs, currentBalance, projectedBalance, totalProjectedIncome, pendingIncome, pendingExpenses]);
 
-    // 9. Initial State
-    if (totalProjectedIncome === 0 && totalProjectedExpenses === 0) {
-      items.push({
-        id: 'no-data',
-        type: 'info',
-        title: 'Blind Spot (Ponto Cego Analítico)',
-        problem: 'Eu opero baseado em dados frios. Sem eles, você está navegando no escuro com sua vida financeira.',
-        solution: 'Sempre lance os valores assim que eles acontecerem, nem um dia a mais, nem a menos. O fluxo de caixa é o pulso da sua riqueza.',
-        action: 'Pareça que foi feito hoje: registre logo acima suas receitas e despesas principais.'
-      });
+  const getStatus = (name: string, spent: number, allocated: number) => {
+    if (allocated === 0) return 'neutral';
+    const percent = spent / allocated;
+    if (name === 'Reserva/Dívidas') {
+      if (percent >= 1.0) return 'good';
+      if (percent >= 0.5) return 'warning';
+      return 'danger';
+    } else {
+      if (percent > 1.05) return 'danger';
+      if (percent > 0.90) return 'warning';
+      return 'good';
     }
-
-    return items;
-  }, [totalProjectedIncome, totalProjectedExpenses, totalProjectedSavings, txs, modeBuckets, debts, goals, allData, data.monthId, previousBalance]);
+  };
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <BrainCircuit className="text-indigo-500" size={28} />
-            Contador Inteligente (Auditor)
-          </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Sua consultoria algorítmica para maximizar o Aporte (APK) e proteger seu patrimônio.</p>
+      <header className="bg-slate-900 dark:bg-slate-950 p-6 sm:p-8 rounded-3xl shadow-xl text-white relative overflow-hidden border border-slate-800">
+        <div className="absolute -right-10 -bottom-10 opacity-[0.03] dark:opacity-10 pointer-events-none">
+          <BrainCircuit size={180} />
         </div>
-      </div>
+        <div className="relative z-10">
+          <h2 className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-3">Inteligência Financeira</h2>
+          <p className="text-2xl sm:text-3xl font-bold mb-4 leading-tight text-white">Engenharia de Crescimento</p>
+          <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50">
+            <p className="text-sm font-serif italic mb-3 text-slate-300">
+              "A riqueza do sábio é a sua coroa... Os planos bem elaborados levam à fartura; mas o apressado sempre acaba na miséria."
+            </p>
+            <p className="text-xs text-emerald-400 font-semibold text-right">— Princípio Milenar (Pv 14:24 / 21:5)</p>
+          </div>
+        </div>
+      </header>
 
-      {/* PAINEL DE ANÁLISE E SOLUÇÕES */}
-      <div className="space-y-4">
-        {advices.map(advice => (
-          <div key={advice.id} className={`rounded-2xl border-2 p-1 overflow-hidden transition-all ${
-            advice.type === 'danger' ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-500/20 shadow-[0_0_15px_rgba(225,29,72,0.15)]' :
-            advice.type === 'warning' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-500/20 shadow-[0_0_15px_rgba(217,119,6,0.1)]' :
-            advice.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]' :
-            'bg-indigo-50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
-          }`}>
-            <div className="bg-white dark:bg-slate-900 rounded-xl p-5 sm:p-6 shadow-sm">
-              <div className="flex items-start gap-4">
-                <div className="mt-1 shrink-0">
-                  {advice.type === 'danger' && <ShieldAlert className="text-rose-600 dark:text-rose-400 animate-pulse" size={28} />}
-                  {advice.type === 'warning' && <AlertTriangle className="text-amber-600 dark:text-amber-400" size={28} />}
-                  {advice.type === 'success' && <ArrowUpCircle className="text-emerald-600 dark:text-emerald-400" size={28} />}
-                  {advice.type === 'info' && <FileText className="text-indigo-600 dark:text-indigo-400" size={28} />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className={`text-lg font-black mb-3 ${
-                    advice.type === 'danger' ? 'text-rose-900 dark:text-rose-300' :
-                    advice.type === 'warning' ? 'text-amber-900 dark:text-amber-300' :
-                    advice.type === 'success' ? 'text-emerald-900 dark:text-emerald-300' :
-                    'text-indigo-900 dark:text-indigo-300'
-                  }`}>{advice.title}</h4>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                        Diagnóstico Analítico
-                      </p>
-                      <p className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed">{advice.problem}</p>
+      {totalProjectedIncome === 0 ? (
+        <div className="glass-card p-8 text-center">
+          <Target className="mx-auto text-slate-300 dark:text-slate-600 mb-4" size={48} />
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Adicione uma Receita</h3>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            Para que o motor de análise gere um planejamento financeiro completo, você precisa adicionar ao menos uma receita (realizada ou pendente/futura) no mês.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Sessão de Análise Inteligente */}
+          <div className="glass-card p-6 sm:p-8">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
+              <Activity className="text-emerald-500" size={22} />
+              Diagnóstico Estratégico
+            </h3>
+            
+            <div className="space-y-4">
+              {strategies.map(strat => (
+                <div key={strat.id} className={`p-5 rounded-2xl border ${
+                  strat.type === 'danger' ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20' :
+                  strat.type === 'warning' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' :
+                  strat.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' :
+                  'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20'
+                }`}>
+                  <div className="flex gap-4">
+                    <div className="mt-1 shrink-0">
+                      {strat.type === 'danger' && <AlertTriangle className="text-rose-600 dark:text-rose-400" size={24} />}
+                      {strat.type === 'warning' && <AlertTriangle className="text-amber-600 dark:text-amber-400" size={24} />}
+                      {strat.type === 'success' && <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" size={24} />}
+                      {strat.type === 'info' && <Activity className="text-indigo-600 dark:text-indigo-400" size={24} />}
                     </div>
-                    
-                    <div className={`p-4 rounded-xl border ${
-                      advice.type === 'danger' ? 'bg-rose-50/50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800' :
-                      advice.type === 'warning' ? 'bg-amber-50/50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800' :
-                      advice.type === 'success' ? 'bg-emerald-50/50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800' :
-                      'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800'
-                    }`}>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">Consultoria de Estratégia</p>
-                      <p className="text-slate-800 dark:text-slate-200 text-sm font-medium leading-relaxed mb-4">{advice.solution}</p>
+                    <div className="min-w-0">
+                      <h4 className={`text-base font-bold mb-2 ${
+                        strat.type === 'danger' ? 'text-rose-900 dark:text-rose-300' :
+                        strat.type === 'warning' ? 'text-amber-900 dark:text-amber-300' :
+                        strat.type === 'success' ? 'text-emerald-900 dark:text-emerald-300' :
+                        'text-indigo-900 dark:text-indigo-300'
+                      }`}>{strat.title}</h4>
+                      <p className={`text-sm leading-relaxed mb-4 ${
+                        strat.type === 'danger' ? 'text-rose-800 dark:text-rose-400/90' :
+                        strat.type === 'warning' ? 'text-amber-800 dark:text-amber-400/90' :
+                        strat.type === 'success' ? 'text-emerald-800 dark:text-emerald-400/90' :
+                        'text-indigo-800 dark:text-indigo-400/90'
+                      }`}>{strat.description}</p>
                       
-                      <div className={`flex items-start gap-2.5 text-sm p-3 rounded-lg border font-medium shadow-sm ${
-                         advice.type === 'danger' ? 'bg-rose-600 text-white border-rose-700' :
-                         advice.type === 'warning' ? 'bg-amber-500 text-white border-amber-600' :
-                         advice.type === 'success' ? 'bg-emerald-600 text-white border-emerald-700' :
-                         'bg-indigo-600 text-white border-indigo-700'
+                      <div className={`text-sm p-4 rounded-xl border ${
+                        strat.type === 'danger' ? 'bg-white/80 dark:bg-slate-900/60 border-rose-200/60 dark:border-rose-500/30 text-rose-900 dark:text-rose-200' :
+                        strat.type === 'warning' ? 'bg-white/80 dark:bg-slate-900/60 border-amber-200/60 dark:border-amber-500/30 text-amber-900 dark:text-amber-200' :
+                        strat.type === 'success' ? 'bg-white/80 dark:bg-slate-900/60 border-emerald-200/60 dark:border-emerald-500/30 text-emerald-900 dark:text-emerald-200' :
+                        'bg-white/80 dark:bg-slate-900/60 border-indigo-200/60 dark:border-indigo-500/30 text-indigo-900 dark:text-indigo-200'
                       }`}>
-                        <Zap size={18} className="mt-0.5 shrink-0 text-white/90" />
-                        <p><strong className="text-white">Ação:</strong> {advice.action}</p>
+                        <div className="flex items-start gap-3">
+                          <ArrowRight size={18} className="mt-0.5 shrink-0 opacity-70" />
+                          <p className="leading-relaxed"><strong className="font-bold">Estratégia Aplicada:</strong> {strat.actionable}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-
                 </div>
-              </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* RAIO-X DO ORÇAMENTO ATUAL */}
-      <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm mt-8 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 via-indigo-500 to-rose-500"></div>
-        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
-          <TrendingUp className="text-indigo-500" size={24} />
-          Auditoria de Capital: {budgetMode}
-        </h3>
-        <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Raio-X em tempo real do limite e execução do seu orçamento.</p>
-        
-        <div className="space-y-8">
-          {Object.entries(modeBuckets).map(([name, conf]) => {
-            const config = conf as { percentage: number; color: string; text: string };
-            const allocated = totalProjectedIncome * config.percentage;
-            const spent = getSpentByBucket(name, true);
-            const isSavings = name === "Reserva/Dívidas";
-            const status = getStatus(spent, allocated, isSavings);
+          <div className="glass-card p-6 sm:p-8">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
+              <BarChart4 className="text-emerald-500" size={22} />
+              Auditoria de Alocação de Capital
+            </h3>
             
-            return (
-              <div key={name} className="relative group">
-                <div className="flex justify-between items-end mb-3">
-                  <div>
-                    <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">{name} <span className="text-slate-400 font-medium text-sm ml-1">(Limite Teto de {(config.percentage * 100).toFixed(0)}%)</span></h4>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
-                      Fluxo Executado: {formatCurrency(spent)} <span className="mx-1 text-slate-300 dark:text-slate-600">/</span> {formatCurrency(allocated)}
-                    </p>
-                  </div>
-                  <span className={`text-[10px] font-bold tracking-wider uppercase px-3 py-1.5 rounded-xl border ${
-                    status === 'danger' ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400' :
-                    status === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400' :
-                    'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
-                  }`}>
-                    {isSavings ? (status === 'success' ? 'Meta Atingida' : status === 'warning' ? 'Abaixo da Meta' : 'Alerta: Sem Aportes') : (status === 'danger' ? 'Alerta Crítico (Estouro)' : status === 'warning' ? 'Atenção ao Teto' : 'Controle Excelente')}
-                  </span>
-                </div>
+            <div className="space-y-8">
+              {Object.entries(modeBuckets).map(([name, conf]) => {
+                const config = conf as { percentage: number; color: string; text: string };
+                const allocated = totalProjectedIncome * config.percentage;
+                const spent = getSpentByBucket(name, true);
+                const status = getStatus(name, spent, allocated);
                 
-                <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700">
-                  <div 
-                    className={`h-full transition-all duration-700 ${
-                      status === 'danger' ? 'bg-rose-500' :
-                      status === 'warning' ? 'bg-amber-500' :
-                      'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min((spent / (allocated || 1)) * 100, 100)}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                return (
+                  <div key={name} className="relative">
+                    <div className="flex justify-between items-end mb-3">
+                      <div>
+                        <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">
+                          {name}{' '}
+                          <span className="text-slate-400 font-medium text-sm ml-1">
+                            ({name === 'Reserva/Dívidas' ? 'Meta' : 'Teto'} de {(config.percentage * 100).toFixed(0)}%)
+                          </span>
+                        </h4>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-1">
+                          Consolidado: {formatCurrency(spent)} <span className="mx-1 text-slate-300 dark:text-slate-600">/</span> {formatCurrency(allocated)}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold tracking-wider uppercase px-2.5 py-1.5 rounded-lg ${
+                        status === 'danger' ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' :
+                        status === 'warning' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                      }`}>
+                        {name === 'Reserva/Dívidas' ? (
+                          status === 'good' ? (spent > allocated ? 'Superávit!' : 'Meta Atingida') :
+                          status === 'warning' ? 'Abaixo do Alvo' : 'Alerta Poupança'
+                        ) : (
+                          status === 'danger' ? 'Sinal Vermelho' :
+                          status === 'warning' ? 'Teto Próximo' :
+                          'Dentro da Meta'
+                        )}
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-slate-100 dark:bg-slate-800/80 h-3 rounded-full overflow-hidden mb-3 border border-slate-200 dark:border-slate-700">
+                      <div 
+                        className={`h-full transition-all duration-700 ${
+                          status === 'danger' ? 'bg-rose-500' :
+                          status === 'warning' ? 'bg-amber-500' :
+                          'bg-emerald-500'
+                        }`}
+                        style={{ width: `${Math.min((spent / (allocated || 1)) * 100, 100)}%` }}
+                      />
+                    </div>
+                    
+                    <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                      {name === 'Necessidades' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Limiar de Sustentabilidade. Manter o custo de vida (moradia, contas, mercado) abaixo de {(config.percentage * 100).toFixed(0)}% garante elasticidade contra imprevistos financeiros.</p>
+                      )}
+                      {name === 'Desejos' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Variável de Conforto. Limite de {(config.percentage * 100).toFixed(0)}% destinado ao estilo de vida e escolhas pessoais. É o primeiro centro de custos que deve sofrer cortes em tempos difíceis.</p>
+                      )}
+                      {name === 'Reserva/Dívidas' && (
+                        <p><strong className="text-slate-800 dark:text-slate-200">Fundamento:</strong> Fator Multiplicador e Segurança. A retenção ou amortização de {(config.percentage * 100).toFixed(0)}% acelera sua saída de dívidas, financiando seu colchão de segurança e o futuro.</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

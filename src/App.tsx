@@ -23,6 +23,7 @@ export default function App() {
     initMonth, 
     getMonthlyData, 
     getAccumulatedBalance,
+    getAccountBalancesUpToMonth,
     addTransaction,
     updateTransaction,
     deleteTransaction,
@@ -488,9 +489,6 @@ export default function App() {
               data={monthData} 
               previousBalance={getAccumulatedBalance(monthId)} 
               budgetMode={state.budgetMode || '50-30-20'}
-              allData={state.monthlyData}
-              debts={state.debts}
-              goals={state.goals}
             />
           )}
           {currentTab === 'comparison' && (
@@ -504,6 +502,7 @@ export default function App() {
           onSave={handleSaveTransaction}
           editingTransaction={editingTransaction}
           initialTab={initialTransactionTab}
+          accountBalances={getAccountBalancesUpToMonth(monthId)}
         />
 
         <ActionMenuModal

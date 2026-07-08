@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical } from 'lucide-react';
+import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical, Wallet, PiggyBank, CreditCard, Coins } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData, Goal, BudgetMode, Debt } from '../types';
+import { MonthlyData, Goal, BudgetMode, Debt, AccountType } from '../types';
 import { DebtsSection } from './DebtsSection';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
@@ -72,8 +72,12 @@ export function Dashboard({
   const netTransfersToSavings = data.transactions
     .filter(t => !t.isPending)
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return sum + t.amount;
-      if (t.type === 'transfer_from_savings') return sum - t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+        return sum + t.amount;
+      }
+      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
+        return sum - t.amount;
+      }
       return sum;
     }, 0);
 
@@ -89,12 +93,84 @@ export function Dashboard({
 
   const projectedNetTransfersToSavings = data.transactions
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return sum + t.amount;
-      if (t.type === 'transfer_from_savings') return sum - t.amount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+        return sum + t.amount;
+      }
+      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
+        return sum - t.amount;
+      }
       return sum;
     }, 0);
 
   const projectedBalance = previousBalance + projectedIncome - projectedExpenses - projectedNetTransfersToSavings;
+
+  const accountBalances = useMemo(() => {
+    const balances = {
+      banco: 0,
+      reserva: 0,
+      carteira: 0
+    };
+
+    const sortedMonthIds = Object.keys(allData).sort();
+
+    for (const mId of sortedMonthIds) {
+      if (mId > data.monthId) continue;
+
+      const month = allData[mId];
+      if (!month || !month.transactions) continue;
+
+      for (const t of month.transactions) {
+        if (t.isPending) continue;
+
+        const amt = t.amount;
+        const act = (t.account || 'banco') as AccountType;
+
+        if (t.type === 'income') {
+          if (balances[act] !== undefined) {
+            balances[act] += amt;
+          } else {
+            balances['banco'] += amt;
+          }
+        } else if (t.type === 'expense') {
+          if (t.bucket === 'Reserva/Dívidas') {
+            if (balances[act] !== undefined) {
+              balances[act] -= amt;
+            } else {
+              balances['banco'] -= amt;
+            }
+            balances['reserva'] += amt;
+          } else {
+            if (balances[act] !== undefined) {
+              balances[act] -= amt;
+            } else {
+              balances['banco'] -= amt;
+            }
+          }
+        } else if (t.type === 'transfer_to_savings') {
+          if (balances[act] !== undefined) {
+            balances[act] -= amt;
+          } else {
+            balances['banco'] -= amt;
+          }
+          balances['reserva'] += amt;
+        } else if (t.type === 'transfer_from_savings') {
+          balances['reserva'] -= amt;
+          if (balances[act] !== undefined) {
+            balances[act] += amt;
+          } else {
+            balances['banco'] += amt;
+          }
+        } else if (t.type === 'transfer_between_accounts') {
+          const fromAct = (t.account || 'banco') as AccountType;
+          const toAct = (t.toAccount || 'carteira') as AccountType;
+          if (balances[fromAct] !== undefined) balances[fromAct] -= amt;
+          if (balances[toAct] !== undefined) balances[toAct] += amt;
+        }
+      }
+    }
+
+    return balances;
+  }, [allData, data.monthId]);
 
   const raioX = useMemo(() => {
     const savingsRatio = totalIncome > 0 ? (netTransfersToSavings / totalIncome) : 0;
@@ -352,6 +428,7 @@ export function Dashboard({
 
   const DEFAULT_CARD_ORDER = [
     'raioX',
+    'contas',
     'analiseMensal',
     'contasAPagar',
     'distribuicao',
@@ -365,6 +442,7 @@ export function Dashboard({
 
   const CARD_LABELS: Record<string, { label: string; icon: string }> = {
     raioX: { label: 'Raio-X Financeiro', icon: '🔍' },
+    contas: { label: 'Minhas Contas e Saldos', icon: '🏦' },
     analiseMensal: { label: 'Análise Mensal', icon: '📊' },
     contasAPagar: { label: 'Contas a Pagar', icon: '📅' },
     distribuicao: { label: 'Distribuição de Gastos', icon: '🍕' },
@@ -533,6 +611,81 @@ export function Dashboard({
     </motion.div>
   );
 
+  const renderContas = () => {
+    const totalPatrimonio = accountBalances.banco + accountBalances.reserva + accountBalances.carteira;
+
+    return (
+      <motion.div 
+        key="contas"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="glass-card p-6 border-slate-100/80 dark:border-slate-800 bg-white dark:bg-slate-900 relative overflow-hidden animate-fade-in shadow-md"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full filter blur-2xl pointer-events-none" />
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
+              🏦
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Distribuição do Dinheiro</h2>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Onde estão alocados seus recursos</span>
+            </div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/60 px-4 py-2 rounded-2xl text-left sm:text-right">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Patrimônio Total</span>
+            <span className={`text-lg font-black ${totalPatrimonio >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+              {formatCurrency(totalPatrimonio)}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Banco */}
+          <div className="p-4 rounded-2xl bg-blue-50/40 dark:bg-blue-500/5 border border-blue-100/50 dark:border-blue-500/10 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <CreditCard size={20} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">🏦 No Banco</span>
+              <span className={`text-base font-bold block truncate ${accountBalances.banco >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatCurrency(accountBalances.banco)}
+              </span>
+            </div>
+          </div>
+
+          {/* Reserva */}
+          <div className="p-4 rounded-2xl bg-emerald-50/40 dark:bg-emerald-500/5 border border-emerald-100/50 dark:border-emerald-500/10 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <PiggyBank size={20} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">💰 Na Reserva</span>
+              <span className={`text-base font-bold block truncate ${accountBalances.reserva >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatCurrency(accountBalances.reserva)}
+              </span>
+            </div>
+          </div>
+
+          {/* Carteira */}
+          <div className="p-4 rounded-2xl bg-amber-50/40 dark:bg-amber-500/5 border border-amber-100/50 dark:border-amber-500/10 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Wallet size={20} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold leading-none mb-1">💵 Na Carteira</span>
+              <span className={`text-base font-bold block truncate ${accountBalances.carteira >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+                {formatCurrency(accountBalances.carteira)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   const renderAnaliseMensal = () => (
     <div key="analiseMensal" className="glass-card p-6 animate-fade-in">
       <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
@@ -698,9 +851,35 @@ export function Dashboard({
             
             <div className="flex justify-between text-sm">
               <span className="text-slate-500 dark:text-slate-400">{spentLabel}: {formatCurrency(spent)}</span>
-              <span className={`font-medium ${remaining < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                Resta: {formatCurrency(remaining)}
-              </span>
+              {name === 'Reserva/Dívidas' ? (
+                remaining < 0 ? (
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    Superávit: +{formatCurrency(Math.abs(remaining))}
+                  </span>
+                ) : remaining === 0 ? (
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    Meta Atingida!
+                  </span>
+                ) : (
+                  <span className="font-medium text-slate-500 dark:text-slate-400">
+                    Falta: {formatCurrency(remaining)}
+                  </span>
+                )
+              ) : (
+                remaining < 0 ? (
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
+                    Excedido: {formatCurrency(Math.abs(remaining))}
+                  </span>
+                ) : remaining === 0 ? (
+                  <span className="font-medium text-slate-500 dark:text-slate-400">
+                    Limite Atingido
+                  </span>
+                ) : (
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    Resta: {formatCurrency(remaining)}
+                  </span>
+                )
+              )}
             </div>
           </div>
         );
@@ -746,8 +925,12 @@ export function Dashboard({
             Object.values(allData).reduce((sum, month) => {
               return sum + month.transactions.reduce((mSum, t) => {
                 if (t.isPending) return mSum;
-                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas')) return mSum + t.amount;
-                if (t.type === 'transfer_from_savings') return mSum - t.amount;
+                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+                  return mSum + t.amount;
+                }
+                if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
+                  return mSum - t.amount;
+                }
                 return mSum;
               }, 0);
             }, 0)
@@ -949,6 +1132,7 @@ export function Dashboard({
       {activeCardOrder.map((key) => {
         switch (key) {
           case 'raioX': return renderRaioX();
+          case 'contas': return renderContas();
           case 'analiseMensal': return renderAnaliseMensal();
           case 'contasAPagar': return renderContasAPagar();
           case 'distribuicao': return renderDistribuicao();

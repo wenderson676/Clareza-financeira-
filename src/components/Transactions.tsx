@@ -86,7 +86,7 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
               <div className="glass-card overflow-hidden">
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {group.transactions.map(t => {
-                    const isTransfer = t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || (t.type === 'expense' && t.bucket === 'Reserva Financeira');
+                    const isTransfer = t.type === 'transfer_to_savings' || t.type === 'transfer_from_savings' || t.type === 'transfer_between_accounts' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas');
                     const isIncome = t.type === 'income' || t.type === 'transfer_from_savings';
                     
                     return (
@@ -120,6 +120,10 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending }: Transa
                             
                             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                               <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md truncate">{t.category}</span>
+                              <span className="text-slate-300 dark:text-slate-700">•</span>
+                              <span className="px-2 py-1 bg-indigo-50/60 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-md text-[11px]">
+                                {t.account === 'reserva' ? '💰 Reserva' : t.account === 'carteira' ? '💵 Carteira' : '🏦 Banco'}
+                              </span>
                               {t.type === 'expense' && (
                                 <>
                                   <span className="text-slate-300 dark:text-slate-700">•</span>

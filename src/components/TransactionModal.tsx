@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { X } from 'lucide-react';
-import { Transaction, TransactionType, Bucket } from '../types';
+import { Transaction, TransactionType, Bucket, AccountType } from '../types';
 import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,17 +11,21 @@ interface TransactionModalProps {
   onSave: (t: Omit<Transaction, 'id'>) => void;
   editingTransaction?: Transaction | null;
   initialTab?: 'expense' | 'income' | 'transfer';
+  accountBalances?: { banco: number; reserva: number; carteira: number; };
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab }: TransactionModalProps) {
+export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab, accountBalances }: TransactionModalProps) {
   const [formTab, setFormTab] = useState<'expense' | 'income' | 'transfer'>('expense');
-  const [transferDirection, setTransferDirection] = useState<'to_savings' | 'from_savings'>('to_savings');
+  const [transferFrom, setTransferFrom] = useState<AccountType>('banco');
+  const [transferTo, setTransferTo] = useState<AccountType>('reserva');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [bucket, setBucket] = useState<Bucket>('Necessidades');
   const [category, setCategory] = useState('');
   const [isPending, setIsPending] = useState(false);
+  const [account, setAccount] = useState<AccountType>('banco');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -30,14 +34,24 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
         setDescription(editingTransaction.description);
         setDate(editingTransaction.date);
         setIsPending(editingTransaction.isPending);
+        setAccount(editingTransaction.account || 'banco');
         
         if (editingTransaction.type === 'income') {
           setFormTab('income');
           setCategory(editingTransaction.category);
           setBucket('Renda');
-        } else if (editingTransaction.type === 'transfer_to_savings' || editingTransaction.type === 'transfer_from_savings') {
+        } else if (editingTransaction.type === 'transfer_to_savings' || editingTransaction.type === 'transfer_from_savings' || editingTransaction.type === 'transfer_between_accounts') {
           setFormTab('transfer');
-          setTransferDirection(editingTransaction.type === 'transfer_to_savings' ? 'to_savings' : 'from_savings');
+          if (editingTransaction.type === 'transfer_to_savings') {
+            setTransferFrom('banco');
+            setTransferTo('reserva');
+          } else if (editingTransaction.type === 'transfer_from_savings') {
+            setTransferFrom('reserva');
+            setTransferTo('banco');
+          } else {
+            setTransferFrom(editingTransaction.account || 'banco');
+            setTransferTo(editingTransaction.toAccount || 'carteira');
+          }
         } else {
           setFormTab(initialTab || 'expense');
           setBucket(editingTransaction.bucket);
@@ -71,8 +85,11 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     setBucket(initialTab === "income" ? "Renda" : "Necessidades");
     setFormTab(initialTab || "expense");
     setIsPending(false);
-    setTransferDirection("to_savings");
+    setTransferFrom("banco");
+    setTransferTo("reserva");
     setDate(format(new Date(), "yyyy-MM-dd"));
+    setAccount("banco");
+    setError("");
   };
 
 
@@ -82,22 +99,72 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
   };
 
   const handleSaveTransaction = (shouldClose: boolean) => {
+    setError('');
     const parsedAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
     if (!parsedAmount || isNaN(parsedAmount) || !description || (formTab !== 'transfer' && !category)) return;
+
+    if (formTab === 'transfer' && accountBalances) {
+      if (transferFrom === transferTo) {
+        setError('A conta de origem e destino não podem ser as mesmas.');
+        return;
+      }
+      
+      const availableBalance = accountBalances[transferFrom] || 0;
+      
+      let amountDifference = parsedAmount;
+      if (editingTransaction && editingTransaction.type.startsWith('transfer_')) {
+        let originalFrom: AccountType = 'banco';
+        if (editingTransaction.type === 'transfer_to_savings') {
+          originalFrom = 'banco';
+        } else if (editingTransaction.type === 'transfer_from_savings') {
+          originalFrom = 'reserva';
+        } else if (editingTransaction.type === 'transfer_between_accounts') {
+          originalFrom = editingTransaction.account || 'banco';
+        }
+
+        if (originalFrom === transferFrom) {
+          amountDifference = parsedAmount - editingTransaction.amount;
+        }
+      }
+
+      if (amountDifference > 0 && amountDifference > availableBalance) {
+        setError(`Saldo insuficiente na conta de origem (${transferFrom}). Saldo disponível: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(availableBalance)}`);
+        return;
+      }
+    }
 
     let finalType: TransactionType = 'expense';
     let finalBucket: Bucket = bucket;
     let finalCategory = category;
+    let finalAccount = account;
+    let finalToAccount: AccountType | undefined;
 
     if (formTab === 'income') {
       finalType = 'income';
       finalBucket = 'Renda';
     } else if (formTab === 'transfer') {
-      finalType = transferDirection === 'to_savings' ? 'transfer_to_savings' : 'transfer_from_savings';
+      if (transferFrom === 'banco' && transferTo === 'reserva') {
+        finalType = 'transfer_to_savings';
+        finalCategory = 'Transferência para Reserva/Dívidas';
+        finalAccount = 'banco';
+        finalToAccount = undefined;
+      } else if (transferFrom === 'reserva' && transferTo === 'banco') {
+        finalType = 'transfer_from_savings';
+        finalCategory = 'Resgate de Reserva/Dívidas';
+        finalAccount = 'banco';
+        finalToAccount = undefined;
+      } else {
+        finalType = 'transfer_between_accounts';
+        finalCategory = `Transferência de ${transferFrom} para ${transferTo}`;
+        finalAccount = transferFrom;
+        finalToAccount = transferTo;
+      }
       finalBucket = 'Transferência';
-      finalCategory = transferDirection === 'to_savings' ? 'Transferência para Reserva/Dívidas' : 'Resgate de Reserva/Dívidas';
     } else {
       finalType = 'expense';
+      if (finalBucket === 'Reserva/Dívidas' && finalAccount === 'reserva') {
+        finalAccount = 'banco';
+      }
     }
 
     onSave({
@@ -107,7 +174,9 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
       date,
       bucket: finalBucket,
       category: finalCategory,
-      isPending
+      isPending,
+      account: finalAccount,
+      toAccount: finalToAccount
     });
 
     if (shouldClose) {
@@ -147,6 +216,13 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              
+              {error && (
+                <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 p-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
               <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <button
                   type="button"
@@ -178,16 +254,31 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
               </div>
 
               {formTab === 'transfer' && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Direção</label>
-                  <select
-                    value={transferDirection}
-                    onChange={e => setTransferDirection(e.target.value as 'to_savings' | 'from_savings')}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                  >
-                    <option value="to_savings">Saldo → Reserva/Dívidas (Cofrinho)</option>
-                    <option value="from_savings">Reserva/Dívidas (Cofrinho) → Saldo</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">De (Origem)</label>
+                    <select
+                      value={transferFrom}
+                      onChange={e => setTransferFrom(e.target.value as AccountType)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="banco">🏦 Banco</option>
+                      <option value="reserva">💰 Reserva (Cofrinho)</option>
+                      <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Para (Destino)</label>
+                    <select
+                      value={transferTo}
+                      onChange={e => setTransferTo(e.target.value as AccountType)}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="banco">🏦 Banco</option>
+                      <option value="reserva">💰 Reserva (Cofrinho)</option>
+                      <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -249,8 +340,12 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                     <select
                       value={bucket}
                       onChange={e => {
-                        setBucket(e.target.value as Bucket);
+                        const val = e.target.value as Bucket;
+                        setBucket(val);
                         setCategory('');
+                        if (val === 'Reserva/Dívidas' && account === 'reserva') {
+                          setAccount('banco');
+                        }
                       }}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                     >
@@ -278,6 +373,23 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                       <option key={cat} value={cat} />
                     ))}
                   </datalist>
+                </div>
+              )}
+
+              {formTab !== 'transfer' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                    {formTab === 'expense' ? 'Pagar usando' : 'Receber em'}
+                  </label>
+                  <select
+                    value={account === 'reserva' && bucket === 'Reserva/Dívidas' ? 'banco' : account}
+                    onChange={e => setAccount(e.target.value as AccountType)}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-emerald-500 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-medium text-sm"
+                  >
+                    <option value="banco">🏦 Banco</option>
+                    {bucket !== 'Reserva/Dívidas' && <option value="reserva">💰 Reserva (Cofrinho)</option>}
+                    <option value="carteira">💵 Carteira (Dinheiro Físico)</option>
+                  </select>
                 </div>
               )}
 

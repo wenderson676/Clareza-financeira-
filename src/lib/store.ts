@@ -71,6 +71,74 @@ export function useStore() {
     return state.monthlyData[monthId] || { monthId, transactions: [] };
   };
 
+  const getAccountBalancesUpToMonth = (targetMonthId: string) => {
+    const balances = {
+      banco: 0,
+      reserva: 0,
+      carteira: 0
+    };
+
+    const sortedMonthIds = Object.keys(state.monthlyData).sort();
+
+    for (const mId of sortedMonthIds) {
+      if (mId > targetMonthId) continue;
+
+      const month = state.monthlyData[mId];
+      if (!month || !month.transactions) continue;
+
+      for (const t of month.transactions) {
+        if (t.isPending) continue;
+
+        const amt = t.amount;
+        const act = (t.account || 'banco') as 'banco' | 'reserva' | 'carteira';
+
+        if (t.type === 'income') {
+          if (balances[act] !== undefined) {
+            balances[act] += amt;
+          } else {
+            balances['banco'] += amt;
+          }
+        } else if (t.type === 'expense') {
+          if (t.bucket === 'Reserva/Dívidas') {
+            if (balances[act] !== undefined) {
+              balances[act] -= amt;
+            } else {
+              balances['banco'] -= amt;
+            }
+            balances['reserva'] += amt;
+          } else {
+            if (balances[act] !== undefined) {
+              balances[act] -= amt;
+            } else {
+              balances['banco'] -= amt;
+            }
+          }
+        } else if (t.type === 'transfer_to_savings') {
+          if (balances[act] !== undefined) {
+            balances[act] -= amt;
+          } else {
+            balances['banco'] -= amt;
+          }
+          balances['reserva'] += amt;
+        } else if (t.type === 'transfer_from_savings') {
+          balances['reserva'] -= amt;
+          if (balances[act] !== undefined) {
+            balances[act] += amt;
+          } else {
+            balances['banco'] += amt;
+          }
+        } else if (t.type === 'transfer_between_accounts') {
+          const fromAct = (t.account || 'banco') as 'banco' | 'reserva' | 'carteira';
+          const toAct = (t.toAccount || 'carteira') as 'banco' | 'reserva' | 'carteira';
+          if (balances[fromAct] !== undefined) balances[fromAct] -= amt;
+          if (balances[toAct] !== undefined) balances[toAct] += amt;
+        }
+      }
+    }
+
+    return balances;
+  };
+
   const getAccumulatedBalance = (targetMonthId: string): number => {
     let balance = 0;
     const targetDate = parse(targetMonthId, 'yyyy-MM', new Date());
@@ -83,6 +151,10 @@ export function useStore() {
           if (t.type === 'expense') balance -= t.amount;
           if (t.type === 'transfer_to_savings') balance -= t.amount;
           if (t.type === 'transfer_from_savings') balance += t.amount;
+          if (t.type === 'transfer_between_accounts') {
+            if (t.toAccount === 'reserva') balance -= t.amount;
+            else if (t.account === 'reserva') balance += t.amount;
+          }
         });
       }
     });
@@ -282,6 +354,7 @@ export function useStore() {
     getCurrentMonthId,
     initMonth,
     getMonthlyData,
+    getAccountBalancesUpToMonth,
     getAccumulatedBalance,
     addTransaction,
     updateTransaction,
