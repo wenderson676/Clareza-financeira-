@@ -73,10 +73,22 @@ export function parseNotesAndAnnotations(
 
   // Helper to extract first monetary value from a string (e.g. "R$ 750", "750", "120 de luz")
   const extractAmount = (text: string): number | undefined => {
-    // Look for R$ followed by numbers, or just numbers with decimal formats
-    const match = text.match(/(?:R\$\s*)?(\d+(?:[.,]\d{2})?)/i);
+    const match = text.match(/(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:,\d{2})?|\d+(?:\.\d{2})?)/i);
     if (match) {
-      const value = match[1].replace('.', '').replace(',', '.');
+      let value = match[1];
+      if (value.includes(",")) {
+        value = value.replace(/\./g, "").replace(",", ".");
+      } else {
+        const dotCount = (value.match(/\./g) || []).length;
+        if (dotCount > 1) {
+           value = value.replace(/\./g, "");
+        } else if (dotCount === 1) {
+           const parts = value.split(".");
+           if (parts[1].length === 3) {
+             value = value.replace(".", "");
+           }
+        }
+      }
       const num = parseFloat(value);
       return isNaN(num) ? undefined : num;
     }
@@ -210,10 +222,20 @@ export function parseNotesAndAnnotations(
     if (c.source === 'nota_geral' && c.amount) {
       // Find a transaction with same type and exact amount
       const tType = c.type === 'receita' ? 'income' : 'expense';
-      const match = transactions.find(t => 
-        t.type === tType && 
-        Math.abs(t.amount - (c.amount || 0)) < 1 // Match within 1 BRL
-      );
+      
+      const cWords = c.text.toLowerCase().split(/\s+/);
+      const meaningfulWords = cWords.filter(w => w.length > 2 && !['para', 'com', 'vou', 'paguei', 'recebi', 'fatura', 'pagar', 'dia', 'neste', 'mes'].includes(w) && isNaN(parseFloat(w)));
+
+      const match = transactions.find(t => {
+         if (t.type !== tType) return false;
+         if (Math.abs(t.amount - (c.amount || 0)) > 5) return false; // Match within 5 BRL
+         
+         const tWords = t.description.toLowerCase().split(/\s+/);
+         if (meaningfulWords.length === 0) return true; // Just match by amount if note has no meaningful words
+         
+         return meaningfulWords.some(w => tWords.some(tw => tw.includes(w) || w.includes(tw)));
+      });
+
       if (match) {
         return false; // Skip this note, it's already a transaction
       }
@@ -335,14 +357,23 @@ export function generateFinancialDiagnosis(
   let projectedExpense30D = totalDebtMonthly;
   let projectedIncome30D = 0;
   
+  // Add pending transactions
+  txs.filter(t => t.isPending).forEach(t => {
+    if (t.type === 'expense') projectedExpense30D += t.amount;
+    if (t.type === 'income') projectedIncome30D += t.amount;
+  });
+
   globalCommitments.forEach(c => {
     if ((c.status === 'pendente' || c.status === 'planejado' || c.status === 'atrasado') && c.amount) {
-      if (c.type === 'despesa' || c.type === 'divida') projectedExpense30D += c.amount;
-      if (c.type === 'receita') projectedIncome30D += c.amount;
+      // Only add from global commitments if they are nota_geral, as transactions are already covered
+      if (c.source === 'nota_geral') {
+         if (c.type === 'despesa' || c.type === 'divida') projectedExpense30D += c.amount;
+         if (c.type === 'receita') projectedIncome30D += c.amount;
+      }
     }
   });
 
-  const availableCash30D = totalAssets + projectedIncome30D;
+  const availableCash30D = Math.max(0, currentBalance) + projectedIncome30D;
   const cashFlowPressure30D = availableCash30D > 0 ? (projectedExpense30D / availableCash30D) * 100 : (projectedExpense30D > 0 ? 150 : 0);
 
   // 7. Determine Financial Mode & Risk
