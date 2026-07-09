@@ -71,6 +71,10 @@ export function Planning({
       title: 'Runway (Reserva de Sobrevivência)',
       desc: 'Mostra quantos meses você conseguiria honrar seus custos de vida caso ficasse sem qualquer receita a partir de hoje. É o índice que mede sua paz financeira e proteção em imprevistos.'
     },
+    cashFlowPressure: {
+      title: 'Pressão de Caixa (30 Dias)',
+      desc: 'Mede o nível de aperto do seu dinheiro para as próximas semanas. Acima de 90% significa risco de déficit, ou seja, quase todo o dinheiro disponível já está comprometido.'
+    },
     projection: {
       title: 'Projeção de Fluxo de Caixa',
       desc: 'A projeção é o espelho do seu amanhã com base na realidade de hoje. Ela calcula seu saldo futuro somando os ganhos recorrentes e subtraindo os pagamentos de parcelas, metas e contas anotadas de forma explícita. Sem dados inventados!'
@@ -235,7 +239,7 @@ export function Planning({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               
               {/* Savings Rate */}
               <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
@@ -258,7 +262,7 @@ export function Planning({
               {/* Debt to Income Ratio */}
               <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
-                  Índice DTI (Dívidas)
+                  Índice DTI
                   <button 
                     onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'dtiRatio' ? null : 'dtiRatio')}
                     className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
@@ -276,7 +280,7 @@ export function Planning({
               {/* Fixed Cost Overhead */}
               <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
-                  Custo de Vida Fixo
+                  Custo Fixo
                   <button 
                     onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'fixedOverhead' ? null : 'fixedOverhead')}
                     className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
@@ -294,7 +298,7 @@ export function Planning({
               {/* Runway months */}
               <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
                 <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
-                  Runway (Proteção)
+                  Runway
                   <button 
                     onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'runway' ? null : 'runway')}
                     className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
@@ -306,7 +310,25 @@ export function Planning({
                 <span className={`text-lg font-black block ${diagnosis.metrics.runwayMonths < 1 ? 'text-rose-500' : 'text-emerald-500'}`}>
                   {diagnosis.metrics.runwayMonths === 99 ? '∞' : `${diagnosis.metrics.runwayMonths.toFixed(1)}m`}
                 </span>
-                <p className="text-[9px] text-slate-400 mt-1">Garante paz em emergências</p>
+                <p className="text-[9px] text-slate-400 mt-1">Paz em emergências</p>
+              </div>
+
+              {/* Cash Flow Pressure 30D */}
+              <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 text-center relative group">
+                <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-center gap-1 mb-1">
+                  Pressão 30D
+                  <button 
+                    onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'cashFlowPressure' ? null : 'cashFlowPressure')}
+                    className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors"
+                    title="Explicar"
+                  >
+                    <HelpCircle size={12} />
+                  </button>
+                </span>
+                <span className={`text-lg font-black block ${diagnosis.metrics.cashFlowPressure30D > 90 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                  {diagnosis.metrics.cashFlowPressure30D.toFixed(0)}%
+                </span>
+                <p className="text-[9px] text-slate-400 mt-1">Risco &gt; 90%</p>
               </div>
 
             </div>

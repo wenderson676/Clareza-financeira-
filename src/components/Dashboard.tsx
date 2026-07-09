@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical, Wallet, PiggyBank, CreditCard, Coins } from 'lucide-react';
+import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical, Wallet, PiggyBank, CreditCard, Coins, Bell, BellRing, Check } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account } from '../types';
 import { DebtsSection } from './DebtsSection';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { checkAndTriggerNotifications, requestNotificationPermission, getNotificationPermissionStatus, TransactionAlert } from '../lib/notifications';
 
 interface DashboardProps {
   data: MonthlyData;
@@ -29,6 +30,7 @@ interface DashboardProps {
   addAccount?: (account: Omit<Account, 'id'>) => void;
   updateAccount?: (id: string, updated: Partial<Account>) => void;
   deleteAccount?: (id: string) => void;
+  onTogglePending?: (monthId: string, id: string) => void;
 }
 
 export function Dashboard({ 
@@ -51,13 +53,29 @@ export function Dashboard({
   accounts = [],
   addAccount,
   updateAccount,
-  deleteAccount
+  deleteAccount,
+  onTogglePending
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
+  const [chartViewType, setChartViewType] = useState<'pizza' | 'barras'>('pizza');
+  const [chartDataType, setChartDataType] = useState<'expense' | 'income'>('expense');
   
   const [note, setNote] = useState(data.devotionalNote || '');
   const [isEditingNote, setIsEditingNote] = useState(false);
+
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>(() => {
+    return typeof window !== 'undefined' ? getNotificationPermissionStatus() : 'default';
+  });
+
+  const alerts = useMemo(() => {
+    return checkAndTriggerNotifications(allData as any);
+  }, [allData]);
+
+  const handleRequestPermission = async () => {
+    const status = await requestNotificationPermission();
+    setPermissionStatus(status);
+  };
 
   const [isManagingAccounts, setIsManagingAccounts] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -508,7 +526,7 @@ export function Dashboard({
     contas: { label: 'Minhas Contas e Saldos', icon: '🏦' },
     analiseMensal: { label: 'Análise Mensal', icon: '📊' },
     contasAPagar: { label: 'Contas a Pagar', icon: '📅' },
-    distribuicao: { label: 'Distribuição de Gastos', icon: '🍕' },
+    distribuicao: { label: 'Análise por Categoria', icon: '📊' },
     envelopes: { label: 'Progresso dos Envelopes', icon: '✉️' },
     dividas: { label: 'Painel de Dívidas', icon: '🎯' },
     cofrinho: { label: 'Cofrinho (Metas e Sonhos)', icon: '🐷' },
@@ -805,57 +823,210 @@ export function Dashboard({
   };
 
   const renderDistribuicao = () => {
-    const CHART_COLORS: Record<string, string> = {
-      'Necessidades': '#3b82f6', // blue-500
-      'Desejos': '#f59e0b', // amber-500
-      'Reserva/Dívidas': '#10b981' // emerald-500
-    };
+    const isDarkMode = typeof window !== 'undefined' ? document.documentElement.classList.contains('dark') : false;
+    const transactions = data.transactions || [];
     
-    const pieData = Object.keys(modeBuckets).map((name) => {
-      let spent = 0;
-      if (name === 'Reserva/Dívidas') {
-        spent = netTransfersToSavings;
-      } else {
-        spent = getBucketSpent(name);
-      }
-      return {
+    // Group transactions by category based on selected type ('expense' or 'income')
+    const grouped: Record<string, number> = {};
+    transactions
+      .filter(t => t.type === chartDataType && !t.isPending)
+      .forEach(t => {
+        const cat = t.category || (chartDataType === 'income' ? 'Outras Receitas' : 'Outras Despesas');
+        grouped[cat] = (grouped[cat] || 0) + t.amount;
+      });
+      
+    const total = Object.values(grouped).reduce((sum, val) => sum + val, 0);
+    
+    // Convert to array and sort descending by amount
+    const chartDataList = Object.entries(grouped)
+      .map(([name, value]) => ({
         name,
-        value: spent > 0 ? spent : 0,
-        fill: CHART_COLORS[name] || '#ccc'
-      };
-    }).filter(item => item.value > 0);
+        value,
+        percentage: total > 0 ? (value / total) * 100 : 0
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    const CATEGORY_COLORS = [
+      '#3b82f6', // blue-500
+      '#10b981', // emerald-500
+      '#f59e0b', // amber-500
+      '#8b5cf6', // violet-500
+      '#ec4899', // pink-500
+      '#ef4444', // red-500
+      '#06b6d4', // cyan-500
+      '#14b8a6', // teal-500
+      '#6366f1', // indigo-500
+      '#f97316', // orange-500
+      '#a855f7', // purple-500
+    ];
+
+    const pieData = chartDataList.map((item, idx) => ({
+      ...item,
+      fill: CATEGORY_COLORS[idx % CATEGORY_COLORS.length]
+    }));
 
     return (
-      <div key="distribuicao" className="glass-card p-6 animate-fade-in">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Distribuição de Gastos</h2>
-        
+      <div key="distribuicao" className="glass-card p-6 animate-fade-in border-slate-100/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="text-left">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <span>📊</span> Análise por Categoria
+            </h2>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">Veja onde está gastando ou recebendo este mês</p>
+          </div>
+          
+          {/* Controls Container */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Expense vs Income Toggle */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-1 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex shrink-0">
+              <button
+                onClick={() => setChartDataType('expense')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  chartDataType === 'expense'
+                    ? 'bg-rose-500 text-white shadow-sm shadow-rose-500/20'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Gastos
+              </button>
+              <button
+                onClick={() => setChartDataType('income')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  chartDataType === 'income'
+                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Receitas
+              </button>
+            </div>
+
+            {/* Pie vs Bar Chart Toggle */}
+            <div className="bg-slate-50 dark:bg-slate-950 p-1 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex shrink-0">
+              <button
+                onClick={() => setChartViewType('pizza')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  chartViewType === 'pizza'
+                    ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+                title="Gráfico de Pizza"
+              >
+                🍕 Pizza
+              </button>
+              <button
+                onClick={() => setChartViewType('barras')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  chartViewType === 'barras'
+                    ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+                title="Gráfico de Barras"
+              >
+                📊 Barras
+              </button>
+            </div>
+          </div>
+        </div>
+
         {pieData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-slate-400 text-sm">
-            Nenhum dado para exibir ainda.
+          <div className="h-48 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 text-sm gap-2 bg-slate-50/50 dark:bg-slate-950/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+            <span>📭</span>
+            <span>Nenhuma transação de {chartDataType === 'expense' ? 'gasto' : 'receita'} lançada este mês.</span>
           </div>
         ) : (
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Chart Side */}
+            <div className="lg:col-span-6 h-60 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                {chartViewType === 'pizza' ? (
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                        backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                        color: isDarkMode ? '#f8fafc' : '#0f172a'
+                      }}
+                    />
+                  </PieChart>
+                ) : (
+                  <BarChart data={pieData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#1e293b' : '#f1f5f9'} />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 9, fontWeight: 700 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      tick={{ fill: isDarkMode ? '#94a3b8' : '#64748b', fontSize: 9, fontWeight: 700 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(val) => `R$${val}`}
+                    />
+                    <RechartsTooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                        backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                        color: isDarkMode ? '#f8fafc' : '#0f172a'
+                      }}
+                    />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+
+            {/* List Side */}
+            <div className="lg:col-span-6 space-y-2.5 max-h-[250px] overflow-y-auto pr-1">
+              <div className="flex justify-between items-center mb-1 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Categoria</span>
+                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Total ({formatCurrency(total)})</span>
+              </div>
+              {pieData.map((item, index) => (
+                <div 
+                  key={item.name} 
+                  className="flex items-center justify-between p-2 rounded-2xl bg-slate-50/40 dark:bg-slate-950/20 border border-slate-100/30 dark:border-slate-800/20 hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-colors"
                 >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <RechartsTooltip 
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div 
+                      className="w-3 h-3 rounded-full shrink-0" 
+                      style={{ backgroundColor: item.fill }} 
+                    />
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{item.name}</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                      {item.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
+                    {formatCurrency(item.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1172,6 +1343,103 @@ export function Dashboard({
           </div>
         </div>
       </header>
+
+      {/* Central de Notificações e Alertas do APK/Web */}
+      {(alerts.length > 0 || permissionStatus === 'default') && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-colors flex flex-col gap-4 text-left"
+        >
+          {/* Solicitar Permissão de Notificação */}
+          {permissionStatus === 'default' && (
+            <div className="flex items-center justify-between gap-3 bg-emerald-50/50 dark:bg-emerald-500/5 p-3.5 rounded-2xl border border-emerald-100/50 dark:border-emerald-500/10">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <Bell size={18} className="animate-bounce" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-tight">Habilitar Notificações</h4>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                    Quer receber avisos de contas e receitas a vencer no seu celular?
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleRequestPermission}
+                className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-sm shadow-emerald-500/10"
+              >
+                Ativar
+              </button>
+            </div>
+          )}
+
+          {/* Lista de Alertas Ativos */}
+          {alerts.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <BellRing size={16} className="text-amber-500 animate-pulse" />
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500" />
+                </div>
+                <h3 className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Avisos Importantes ({alerts.length})</h3>
+              </div>
+
+              <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                {alerts.map((alert) => {
+                  const tx = alert.transaction;
+                  const isIncome = tx.type === 'income';
+                  const isToday = alert.type === 'today';
+                  return (
+                    <div 
+                      key={`${tx.id}_${alert.type}`}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl border transition-all ${
+                        isToday 
+                          ? 'bg-rose-50/30 dark:bg-rose-950/5 border-rose-100/50 dark:border-rose-900/10' 
+                          : 'bg-amber-50/30 dark:bg-amber-950/5 border-amber-100/50 dark:border-amber-900/10'
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className={`shrink-0 mt-0.5 text-[9px] px-2 py-0.5 rounded-full font-extrabold tracking-wider uppercase ${
+                          isToday 
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' 
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        }`}>
+                          {isToday ? 'Vence Hoje' : 'Amanhã'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-xs text-slate-800 dark:text-slate-200 truncate leading-snug">
+                            {tx.description}
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-semibold">
+                            {isIncome ? 'Receita' : 'Conta'} de <span className={isIncome ? 'text-emerald-600 dark:text-emerald-400 font-extrabold' : 'text-slate-700 dark:text-slate-300 font-extrabold'}>{formatCurrency(tx.amount)}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (onTogglePending) {
+                            onTogglePending(alert.monthId, tx.id);
+                          }
+                        }}
+                        className={`shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-extrabold transition-all border cursor-pointer ${
+                          isIncome 
+                            ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700' 
+                            : 'bg-slate-800 border-slate-800 text-white hover:bg-slate-900 dark:bg-slate-700 dark:border-slate-700 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        <Check size={11} strokeWidth={3} />
+                        <span>{isIncome ? 'Marcar Recebido' : 'Confirmar Pagamento'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Barra de Ações para Reordenação */}
       <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-slate-100/60 dark:border-slate-800/80 transition-colors">

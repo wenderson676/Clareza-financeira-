@@ -665,6 +665,7 @@ export default function App() {
               addAccount={addAccount}
               updateAccount={updateAccount}
               deleteAccount={deleteAccount}
+              onTogglePending={toggleTransactionPending}
             />
           )}
           {currentTab === 'transactions' && (

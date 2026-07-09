@@ -11,6 +11,7 @@ export interface FinancialMetrics {
   totalAssets: number;
   totalDebts: number;
   monthlySurplus: number;
+  cashFlowPressure30D: number; // Percentage representing short-term cash pressure
 }
 
 export interface ParsedCommitment {
@@ -20,6 +21,8 @@ export interface ParsedCommitment {
   amount?: number;
   dateStr?: string;
   source: 'nota_geral' | 'transacao';
+  confidence: 'confirmado' | 'alta' | 'media' | 'baixa';
+  status: 'realizado' | 'pendente' | 'planejado' | 'atrasado' | 'incerto';
 }
 
 export interface FinancialProjection {
@@ -27,6 +30,14 @@ export interface FinancialProjection {
   projectedIncome: number;
   projectedExpense: number;
   projectedBalance: number;
+}
+
+export interface RecurrencePattern {
+  category: string;
+  type: 'income' | 'expense';
+  averageAmount: number;
+  frequency: 'mensal' | 'semanal';
+  suggestedAction: string;
 }
 
 export interface FinancialDiagnosis {
@@ -41,6 +52,7 @@ export interface FinancialDiagnosis {
   metrics: FinancialMetrics;
   parsedCommitments: ParsedCommitment[];
   projections: FinancialProjection[];
+  recurrences: RecurrencePattern[];
   actionPlan: {
     today: string[];
     next7Days: string[];
@@ -90,6 +102,13 @@ export function parseNotesAndAnnotations(
       const amt = extractAmount(line);
       const day = extractDay(line);
 
+      // Determine confidence based on presence of amount
+      const confidence = amt ? (day ? 'media' : 'baixa') : 'baixa';
+      // Determine status based on wording
+      const isPast = lower.includes('paguei') || lower.includes('recebi') || lower.includes('já foi');
+      const isLate = lower.includes('atrasado') || lower.includes('venceu') || lower.includes('passou');
+      const status = isPast ? 'realizado' : (isLate ? 'atrasado' : (amt && day ? 'planejado' : 'incerto'));
+
       if (lower.includes('recebi') || lower.includes('receber') || lower.includes('renda') || lower.includes('entrada') || lower.includes('salário') || lower.includes('bico')) {
         commitments.push({
           type: 'receita',
@@ -97,7 +116,9 @@ export function parseNotesAndAnnotations(
           text: line.trim(),
           amount: amt,
           dateStr: day || 'Neste ciclo',
-          source: 'nota_geral'
+          source: 'nota_geral',
+          confidence,
+          status
         });
       } else if (lower.includes('paguei') || lower.includes('pagar') || lower.includes('despesa') || lower.includes('vence') || lower.includes('fatura') || lower.includes('luz') || lower.includes('água') || lower.includes('aluguel') || lower.includes('mercado')) {
         commitments.push({
@@ -106,7 +127,9 @@ export function parseNotesAndAnnotations(
           text: line.trim(),
           amount: amt,
           dateStr: day || 'Neste ciclo',
-          source: 'nota_geral'
+          source: 'nota_geral',
+          confidence,
+          status
         });
       } else if (lower.includes('dívida') || lower.includes('devo') || lower.includes('agiota') || lower.includes('empréstimo') || lower.includes('parcela')) {
         commitments.push({
@@ -115,7 +138,9 @@ export function parseNotesAndAnnotations(
           text: line.trim(),
           amount: amt,
           dateStr: day || 'Vencimento mensal',
-          source: 'nota_geral'
+          source: 'nota_geral',
+          confidence,
+          status: status === 'realizado' ? 'realizado' : (isLate ? 'atrasado' : 'pendente')
         });
       } else if (lower.includes('guardar') || lower.includes('reserva') || lower.includes('poupar') || lower.includes('meta')) {
         commitments.push({
@@ -124,14 +149,18 @@ export function parseNotesAndAnnotations(
           text: line.trim(),
           amount: amt,
           dateStr: 'Planejamento',
-          source: 'nota_geral'
+          source: 'nota_geral',
+          confidence,
+          status: status === 'realizado' ? 'realizado' : 'planejado'
         });
       } else {
         commitments.push({
           type: 'aviso',
           category: 'Anotação Relevante',
           text: line.trim(),
-          source: 'nota_geral'
+          source: 'nota_geral',
+          confidence: 'baixa',
+          status: 'incerto'
         });
       }
     });
@@ -141,7 +170,6 @@ export function parseNotesAndAnnotations(
   transactions.forEach(t => {
     if (t.notes && t.notes.trim()) {
       const lowerNotes = t.notes.toLowerCase();
-      const lowerDesc = t.description.toLowerCase();
       
       if (lowerNotes.includes('atrasad') || lowerNotes.includes('atraso') || lowerNotes.includes('risco')) {
         commitments.push({
@@ -149,7 +177,9 @@ export function parseNotesAndAnnotations(
           category: 'Compromisso Atrasado/Crítico',
           text: `[${t.description}] Alerta em anotação: ${t.notes}`,
           amount: t.amount,
-          source: 'transacao'
+          source: 'transacao',
+          confidence: 'confirmado',
+          status: 'atrasado'
         });
       } else if (lowerNotes.includes('parcela') || lowerNotes.includes('/') || lowerNotes.includes('vezes')) {
         commitments.push({
@@ -157,7 +187,9 @@ export function parseNotesAndAnnotations(
           category: 'Gasto Parcelado Recorrente',
           text: `[${t.description}] ${t.notes}`,
           amount: t.amount,
-          source: 'transacao'
+          source: 'transacao',
+          confidence: 'confirmado',
+          status: t.isPending ? 'pendente' : 'realizado'
         });
       } else if (lowerNotes.includes('recorrente') || lowerNotes.includes('todo mês') || lowerNotes.includes('mensal')) {
         commitments.push({
@@ -165,13 +197,31 @@ export function parseNotesAndAnnotations(
           category: 'Compromisso Fixo Recorrente',
           text: `[${t.description}] Despesa mensal: ${t.notes}`,
           amount: t.amount,
-          source: 'transacao'
+          source: 'transacao',
+          confidence: 'confirmado',
+          status: t.isPending ? 'pendente' : 'realizado'
         });
       }
     }
   });
 
-  return commitments;
+  // 3. Deduplication: Remove "nota_geral" commitments that seem to match actual transactions
+  const deduplicatedCommitments = commitments.filter(c => {
+    if (c.source === 'nota_geral' && c.amount) {
+      // Find a transaction with same type and exact amount
+      const tType = c.type === 'receita' ? 'income' : 'expense';
+      const match = transactions.find(t => 
+        t.type === tType && 
+        Math.abs(t.amount - (c.amount || 0)) < 1 // Match within 1 BRL
+      );
+      if (match) {
+        return false; // Skip this note, it's already a transaction
+      }
+    }
+    return true;
+  });
+
+  return deduplicatedCommitments;
 }
 
 /**
@@ -185,6 +235,14 @@ export function generateFinancialDiagnosis(
   goals: Goal[],
   accounts: Account[]
 ): FinancialDiagnosis {
+  // 0. Aggregate data across all months
+  let allTxs: Transaction[] = [];
+  let allNotes = '';
+  Object.values(allData).forEach(mData => {
+    if (mData.transactions) allTxs = allTxs.concat(mData.transactions);
+    if (mData.devotionalNote) allNotes += mData.devotionalNote + '\n';
+  });
+
   const txs = currentMonthData.transactions || [];
   const devotionalNote = currentMonthData.devotionalNote || '';
 
@@ -216,7 +274,11 @@ export function generateFinancialDiagnosis(
   const necessitiesPercent = totalIncome > 0 ? (totalNecessities / totalIncome) * 100 : 0;
 
   // 5. Run Parse of Text Notes / Annotations
+  // We parse current month's notes to adjust current month's balance
   const parsedCommitments = parseNotesAndAnnotations(devotionalNote, txs);
+  
+  // Also parse all historical notes to identify patterns and global commitments
+  const globalCommitments = parseNotesAndAnnotations(allNotes, allTxs);
 
   // Take parsed notes amounts into account if they aren't registered transactions
   let additionalUnregisteredExpenses = 0;
@@ -242,51 +304,105 @@ export function generateFinancialDiagnosis(
   const fixedOverheadIndex = adjustedIncome > 0 ? ((totalNecessities + totalDebtMonthly) / adjustedIncome) * 100 : (totalNecessities > 0 ? 100 : 0);
   const runwayMonths = adjustedExpenses > 0 ? (totalAssets / adjustedExpenses) : (totalAssets > 0 ? 99 : 0);
 
+  // 6.1 Detect Recurrences
+  const recurrences: RecurrencePattern[] = [];
+  const categoryCounts: Record<string, { count: number, totalAmount: number, type: 'income' | 'expense' }> = {};
+  
+  allTxs.forEach(t => {
+    if (!categoryCounts[t.category]) {
+      categoryCounts[t.category] = { count: 0, totalAmount: 0, type: t.type === 'income' ? 'income' : 'expense' };
+    }
+    categoryCounts[t.category].count += 1;
+    categoryCounts[t.category].totalAmount += t.amount;
+  });
+
+  const numMonths = Object.keys(allData).length || 1;
+  Object.keys(categoryCounts).forEach(cat => {
+    const data = categoryCounts[cat];
+    // If it appears roughly once per month for at least 2 months
+    if (data.count >= 2 && data.count >= numMonths * 0.8 && data.count <= numMonths * 1.5) {
+      recurrences.push({
+        category: cat,
+        type: data.type,
+        averageAmount: data.totalAmount / data.count,
+        frequency: 'mensal',
+        suggestedAction: data.type === 'expense' ? `Sugerimos automatizar ou fixar o limite mensal para ${cat}` : `Boa constância em ${cat}`
+      });
+    }
+  });
+
+  // Calculate 30D projected amounts for pressure score
+  let projectedExpense30D = totalDebtMonthly;
+  let projectedIncome30D = 0;
+  
+  globalCommitments.forEach(c => {
+    if ((c.status === 'pendente' || c.status === 'planejado' || c.status === 'atrasado') && c.amount) {
+      if (c.type === 'despesa' || c.type === 'divida') projectedExpense30D += c.amount;
+      if (c.type === 'receita') projectedIncome30D += c.amount;
+    }
+  });
+
+  const availableCash30D = totalAssets + projectedIncome30D;
+  const cashFlowPressure30D = availableCash30D > 0 ? (projectedExpense30D / availableCash30D) * 100 : (projectedExpense30D > 0 ? 150 : 0);
+
   // 7. Determine Financial Mode & Risk
   let mode: FinancialMode = 'Estabilização';
   let riskLevel: RiskLevel = 'Moderado';
   let mainProblem = '';
 
-  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < -100) || (runwayMonths < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35);
+  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < -100) || (runwayMonths < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35) || cashFlowPressure30D > 120;
 
   if (adjustedIncome === 0 && adjustedExpenses > 0) {
     mode = 'Crise';
     riskLevel = 'Crítico';
-    mainProblem = 'Você ainda não registrou nenhum dinheiro entrando este mês para pagar as contas ativas. Precisamos ajustar isso!';
+    mainProblem = 'Você ainda não registrou dinheiro entrando este mês para cobrir as saídas. Verifique suas receitas.';
   } else if (hasHighSurvivalRisk) {
     mode = 'Crise';
     riskLevel = 'Crítico';
     mainProblem = hasLateDebts 
-      ? 'Tem contas em atraso ou parcelas urgentes sufocando seu bolso agora. Vamos resolver isso juntos!' 
-      : 'Sua carteira está no vermelho! Gastar mais do que ganha traz riscos graves para os próximos dias.';
-  } else if (fixedOverheadIndex > 75 || runwayMonths < 1) {
+      ? 'Contas em atraso estão sufocando seu fluxo de caixa de curto prazo.' 
+      : 'Sua pressão de caixa para os próximos 30 dias está muito alta. Risco de déficit iminente.';
+  } else if (fixedOverheadIndex > 75 || runwayMonths < 1 || cashFlowPressure30D > 90) {
     mode = 'Sobrevivência';
     riskLevel = 'Alto';
-    mainProblem = 'As contas fixas e parcelas engolem quase todo o seu ganho. Sobra muito pouco para respirar se algo der errado.';
-  } else if (runwayMonths < 3) {
+    mainProblem = 'As obrigações engolem quase toda sua disponibilidade. A pressão de caixa exige atenção rápida.';
+  } else if (runwayMonths < 3 || cashFlowPressure30D > 60) {
     mode = 'Estabilização';
     riskLevel = 'Moderado';
-    mainProblem = 'Suas contas estão em dia, mas seu dinheiro guardado para emergências ainda é menor do que 3 meses de despesas.';
+    mainProblem = 'Contas em dia, mas reserva de segurança ainda é frágil para suportar imprevistos severos.';
   } else if (totalDebtAmount === 0 && savingsRate > 20 && runwayMonths >= 3) {
     if (runwayMonths >= 6 && savingsRate > 35) {
       mode = 'Expansão';
       riskLevel = 'Mínimo';
-      mainProblem = 'Sua saúde financeira está excelente! O caminho agora é fazer o dinheiro trabalhar para você de forma segura.';
+      mainProblem = 'Saúde financeira excelente. Fluxo de caixa muito confortável para acelerar multiplicação patrimonial.';
     } else {
       mode = 'Construção';
       riskLevel = 'Baixo';
-      mainProblem = 'Você tem um bom dinheiro sobrando! É hora de acelerar suas metas de vida e realizar seus sonhos.';
+      mainProblem = 'Sobra consistente e risco baixo. Momento ideal para escalar metas de poupança e investimentos.';
     }
   }
 
-  // Find biggest drain (desejos)
-  const desires = txs.filter(t => t.type === 'expense' && t.bucket === 'Desejos');
+  // Find biggest drain globally
+  const desires = allTxs.filter(t => t.type === 'expense' && t.bucket === 'Desejos');
   const catTotals = desires.reduce((acc, t) => {
     acc[t.category] = (acc[t.category] || 0) + t.amount;
     return acc;
   }, {} as Record<string, number>);
   const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
   const biggestDrain = sortedCats.length > 0 && sortedCats[0][1] > 0 ? sortedCats[0][0] : null;
+
+  // Analyze spending categories globally to find trends
+  const expenseCategories = allTxs.filter(t => t.type === 'expense').reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount;
+    return acc;
+  }, {} as Record<string, number>);
+  const topExpenseCategories = Object.entries(expenseCategories).sort((a, b) => b[1] - a[1]).slice(0, 3).map(c => c[0]);
+
+  const incomeCategories = allTxs.filter(t => t.type === 'income').reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount;
+    return acc;
+  }, {} as Record<string, number>);
+  const topIncomeCategories = Object.entries(incomeCategories).sort((a, b) => b[1] - a[1]).slice(0, 2).map(c => c[0]);
 
   // Find biggest debt
   const sortedDebts = [...debts].sort((a, b) => b.totalAmount - a.totalAmount);
@@ -296,8 +412,7 @@ export function generateFinancialDiagnosis(
   const projections: FinancialProjection[] = [];
   const monthNames = ['Mês Atual', 'Mês que vem (Projeção)', 'Daqui a 2 Meses (Projeção)'];
   
-  // Check if we have active debts, active goals or custom annotations indicating future inputs
-  const hasFutureAnnotations = parsedCommitments.some(c => c.source === 'nota_geral');
+  const hasFutureAnnotations = globalCommitments.some(c => c.source === 'nota_geral');
   const hasDebts = debts.length > 0;
   const hasGoals = goals.length > 0;
   
@@ -311,19 +426,16 @@ export function generateFinancialDiagnosis(
         projectedBalance: currentBalance
       });
     } else {
-      // Future months: Only calculate if we have active debts or future annotations/goals
       if (hasDebts || hasFutureAnnotations || hasGoals) {
-        // Collect future income from annotations/recurring
         let pIncome = 0;
-        parsedCommitments.forEach(c => {
+        globalCommitments.forEach(c => {
           if (c.type === 'receita' && c.amount) {
             pIncome += c.amount;
           }
         });
         
-        // Collect future expense from active debts (monthly payment) + goals + annotations
         let pExpense = totalDebtMonthly;
-        parsedCommitments.forEach(c => {
+        globalCommitments.forEach(c => {
           if ((c.type === 'despesa' || c.type === 'divida') && c.amount) {
             pExpense += c.amount;
           }
@@ -337,7 +449,6 @@ export function generateFinancialDiagnosis(
           projectedBalance: tempBalance
         });
       } else {
-        // If there are no future notes/commitments/debts, do not compute or invent values
         projections.push({
           period: monthNames[i],
           projectedIncome: 0,
@@ -355,6 +466,7 @@ export function generateFinancialDiagnosis(
   if (dtiRatio < 20 && totalDebtMonthly > 0) strongPoints.push('O valor mensal pago em dívidas e parcelas está bem pequeno e sob controle.');
   if (debts.length === 0) strongPoints.push('Parabéns! Você não tem nenhuma dívida ativa cadastrada no sistema.');
   if (runwayMonths >= 3) strongPoints.push(`Excelente! Seus recursos cobrem pelo menos ${runwayMonths.toFixed(1)} meses de custos de vida.`);
+  if (topIncomeCategories.length > 0) strongPoints.push(`Sua geração de receita está ancorada em: ${topIncomeCategories.join(', ')}.`);
 
   if (strongPoints.length === 0) {
     strongPoints.push('Você deu o primeiro passo inteligente: encarar seus números de frente para tomar o controle!');
@@ -363,17 +475,18 @@ export function generateFinancialDiagnosis(
   // Attention points
   const attentionPoints: string[] = [];
   if (fixedOverheadIndex > 70) attentionPoints.push(`Suas contas fixas estão muito altas (${fixedOverheadIndex.toFixed(0)}% da renda). Tente abaixar esse peso.`);
-  if (biggestDrain) attentionPoints.push(`Identificamos um gasto relevante em lazer/desejos na categoria: "${biggestDrain}".`);
+  if (biggestDrain) attentionPoints.push(`Identificamos um padrão de gastos elevados em desejos na categoria: "${biggestDrain}".`);
+  if (topExpenseCategories.length > 0) attentionPoints.push(`Suas maiores saídas gerais costumam ser em: ${topExpenseCategories.join(', ')}.`);
   if (totalDebtAmount > adjustedIncome * 2 && totalDebtAmount > 0) attentionPoints.push('Sua dívida total acumulada é maior que duas vezes sua renda mensal. Cuidado com o acúmulo.');
   if (runwayMonths < 1 && adjustedExpenses > 0) attentionPoints.push('Sua reserva dura menos de 1 mês. Qualquer imprevisto pode te deixar apertado.');
 
   // Check if any specific warning word exists in general note
-  const noteLower = devotionalNote.toLowerCase();
+  const noteLower = allNotes.toLowerCase();
   if (noteLower.includes('atrasado') || noteLower.includes('atrasar') || noteLower.includes('aluguel')) {
-    attentionPoints.push('Anotações do sistema apontam que você tem preocupações com atrasos ou contas de moradia.');
+    attentionPoints.push('Anotações do histórico apontam preocupações com atrasos ou contas de moradia urgentes.');
   }
   if (noteLower.includes('agiota') || noteLower.includes('juro') || noteLower.includes('empréstimo')) {
-    attentionPoints.push('Atenção a juros altos de empréstimos ativos informados.');
+    attentionPoints.push('Atenção a menções de juros altos de empréstimos e agiotas no seu diário financeiro.');
   }
 
   // 9. Structured Action Plan based ONLY on user's active APK data & annotations
@@ -383,8 +496,28 @@ export function generateFinancialDiagnosis(
 
   const activeDebts = debts.filter(d => d.totalAmount > 0);
   const activeGoals = goals.filter(g => g.targetAmount > g.currentAmount);
-  const noteExpenses = parsedCommitments.filter(c => c.source === 'nota_geral' && (c.type === 'despesa' || c.type === 'divida'));
-  const noteIncomes = parsedCommitments.filter(c => c.source === 'nota_geral' && c.type === 'receita');
+  const noteExpenses = globalCommitments.filter(c => c.source === 'nota_geral' && (c.type === 'despesa' || c.type === 'divida'));
+  const noteIncomes = globalCommitments.filter(c => c.source === 'nota_geral' && c.type === 'receita');
+
+  // Trigger-based Recommendations
+  if (hasLateDebts) {
+    recommendation = 'Atrasos detectados. Priorize renegociação imediata e congele gastos com Desejos.';
+    insights.push('Atrasos geram juros compostos que destroem o patrimônio rapidamente.');
+  } else if (cashFlowPressure30D > 90) {
+    recommendation = 'Pressão de caixa perigosa. Crie um teto semanal para gastos variáveis e evite novas parcelas.';
+    insights.push(`Sua pressão de caixa para 30 dias está em ${cashFlowPressure30D.toFixed(0)}%. O dinheiro atual está quase todo comprometido.`);
+  } else if (totalDebtAmount > 0 && dtiRatio > 30) {
+    recommendation = 'Dívida cara detectada. Ataque a de maior juros primeiro e evite novas parcelas.';
+    insights.push('Reduzir o endividamento mensal liberará espaço vital no seu orçamento.');
+  } else if (biggestDrain && fixedOverheadIndex < 70 && mode !== 'Expansão') {
+    recommendation = 'Gasto impulsivo detectado. Crie um teto semanal e bloqueie novas compras até normalizar.';
+    insights.push(`O excesso em "${biggestDrain}" está limitando sua capacidade de poupança.`);
+  } else if (savingsRate > 20 && runwayMonths > 3) {
+    recommendation = 'Sobra consistente detectada. Automatize sua reserva mensal e estude migrar para investimentos de maior prazo.';
+    insights.push('Você já possui uma base sólida. O próximo passo é fazer o dinheiro trabalhar sozinho.');
+  } else {
+    recommendation = `Manter estabilidade. Você está na fase de ${mode}. Continue registrando tudo.`;
+  }
 
   // Today's actions
   if (hasLateDebts) {
@@ -393,17 +526,17 @@ export function generateFinancialDiagnosis(
   }
   
   if (biggestDrain) {
-    actionPlan.today.push(`Colocar um teto limite hoje mesmo na categoria de gastos "${biggestDrain}" para evitar vazamentos.`);
+    actionPlan.today.push(`Colocar um limite rígido hoje na categoria "${biggestDrain}" para evitar o esvaziamento do seu caixa.`);
   }
 
   noteExpenses.forEach(c => {
-    if (c.amount && c.amount > 150) {
-      actionPlan.today.push(`Separar o valor de R$ ${c.amount.toFixed(2)} para cobrir o compromisso anotado: "${c.text}".`);
+    if (c.amount && c.amount > 150 && c.status === 'pendente') {
+      actionPlan.today.push(`Garantir a separação de R$ ${c.amount.toFixed(2)} para o compromisso futuro anotado: "${c.text}".`);
     }
   });
 
   if (actionPlan.today.length === 0) {
-    actionPlan.today.push('Revisar os lançamentos do dia e conferir se todos os seus gastos diários estão registrados.');
+    actionPlan.today.push('Revisar os lançamentos do dia e conferir se todos os seus gastos diários estão registrados e deduplicados.');
   }
 
   // Next 7 days actions
@@ -413,7 +546,9 @@ export function generateFinancialDiagnosis(
   }
 
   noteIncomes.forEach(c => {
-    actionPlan.next7Days.push(`Acompanhar a entrada prevista anotada: "${c.text}".`);
+    if (c.status === 'planejado' || c.status === 'pendente') {
+      actionPlan.next7Days.push(`Acompanhar a entrada prevista anotada no seu diário: "${c.text}". (${c.confidence} confiança)`);
+    }
   });
 
   if (activeGoals.length > 0) {
@@ -422,7 +557,7 @@ export function generateFinancialDiagnosis(
   }
 
   if (actionPlan.next7Days.length === 0) {
-    actionPlan.next7Days.push('Se houver algum novo compromisso ou boleto esta semana, anote no aplicativo.');
+    actionPlan.next7Days.push('Anotar qualquer mudança de cenário ou novo boleto para os próximos 7 dias.');
   }
 
   // Next 30 days actions
@@ -436,12 +571,12 @@ export function generateFinancialDiagnosis(
     actionPlan.next30Days.push(`Dividir as sobras do mês de forma equilibrada para impulsionar a meta "${activeGoals[1].title}".`);
   }
 
-  parsedCommitments.filter(c => c.type === 'oportunidade').forEach(c => {
-    actionPlan.next30Days.push(`Executar a oportunidade de acúmulo anotada: "${c.text}".`);
+  globalCommitments.filter(c => c.type === 'oportunidade').forEach(c => {
+    actionPlan.next30Days.push(`Executar a oportunidade de acúmulo anotada no histórico: "${c.text}".`);
   });
 
   if (actionPlan.next30Days.length === 0) {
-    actionPlan.next30Days.push('Avaliar o fechamento do seu mês para garantir que suas receitas foram maiores que as despesas.');
+    actionPlan.next30Days.push('Avaliar o fechamento do seu mês para garantir que suas receitas superem o teto planejado.');
   }
 
   // Next 90 days actions
@@ -449,27 +584,11 @@ export function generateFinancialDiagnosis(
     actionPlan.next90Days.push(`Revisar o progresso das suas metas de poupança, mirando concluir a meta "${activeGoals[0].title}".`);
   }
   if (activeDebts.length > 0) {
-    actionPlan.next90Days.push('Buscar reduzir o seu endividamento total em relação ao nível atual.');
+    actionPlan.next90Days.push('Buscar reduzir o seu endividamento total e renegociar juros altos para proteger o patrimônio.');
   }
 
   if (actionPlan.next90Days.length === 0) {
-    actionPlan.next90Days.push('Manter o hábito de registrar tudo para consolidar seu histórico financeiro de 3 meses.');
-  }
-
-  // Recommendations based on MODE & real features
-  if (mode === 'Crise') {
-    recommendation = 'O foco absoluto agora é estancar saídas. Use o botão (+) para registrar cada centavo e priorize o pagamento de contas essenciais.';
-    insights.push('Com contas em atraso ou saldo negativo, qualquer compra supérflua aumenta o risco de insolvência.');
-    insights.push('Utilize os lembretes de vencimento para evitar multas adicionais em suas contas.');
-  } else if (mode === 'Sobrevivência') {
-    recommendation = `Você está equilibrando as contas, mas o orçamento está apertado na categoria "${biggestDrain || 'Geral'}". Use as Metas de economia para criar um colchão seguro.`;
-    insights.push('Construir uma pequena reserva de segurança na aba de Metas trará a tranquilidade necessária para respirar.');
-  } else if (mode === 'Estabilização') {
-    recommendation = 'Ótimo trabalho mantendo as contas em dia! Aproveite este momento de equilíbrio para focar na eliminação completa de suas parcelas e dívidas ativas.';
-    insights.push('Eliminar as parcelas ativas vai liberar uma fatia enorme da sua renda mensal para você realizar novos planos.');
-  } else {
-    recommendation = 'Seus números estão saudáveis e estáveis! Continue abastecendo suas Metas de economia e planeje novos objetivos no aplicativo.';
-    insights.push('A constância em registrar e poupar mensalmente é o que garante sua segurança de longo prazo.');
+    actionPlan.next90Days.push('Manter o hábito de registrar tudo para consolidar seu histórico financeiro de 3 meses e destravar projeções mais precisas.');
   }
 
   return {
@@ -488,10 +607,12 @@ export function generateFinancialDiagnosis(
       runwayMonths,
       totalAssets,
       totalDebts: totalDebtAmount,
-      monthlySurplus
+      monthlySurplus,
+      cashFlowPressure30D
     },
-    parsedCommitments,
+    parsedCommitments: globalCommitments,
     projections,
+    recurrences,
     actionPlan,
     insights
   };
