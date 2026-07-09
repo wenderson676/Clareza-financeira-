@@ -15,6 +15,7 @@ interface TransactionsProps {
 
 export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts }: TransactionsProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer' | 'pending'>('all');
 
   const getAccountLabel = (accountId?: string) => {
     const found = accounts?.find(a => a.id === accountId);
@@ -35,6 +36,16 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts
         (t.category && t.category.toLowerCase().includes(lowerTerm)) ||
         (t.bucket && t.bucket.toLowerCase().includes(lowerTerm))
       );
+    }
+    
+    if (filterType !== 'all') {
+      filteredTransactions = filteredTransactions.filter(t => {
+        if (filterType === 'pending') return t.isPending;
+        if (filterType === 'income') return t.type === 'income' || t.type === 'transfer_from_savings';
+        if (filterType === 'expense') return t.type === 'expense';
+        if (filterType === 'transfer') return t.type === 'transfer_between_accounts' || t.type === 'transfer_to_savings';
+        return true;
+      });
     }
 
     const sorted = [...filteredTransactions].sort((a, b) => 
@@ -77,6 +88,39 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         />
+      </div>
+
+      <div id="transactions-filters" className="flex overflow-x-auto pb-4 mb-2 gap-2 hide-scrollbar">
+        <button
+          onClick={() => setFilterType('all')}
+          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${filterType === 'all' ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'}`}
+        >
+          Todos
+        </button>
+        <button
+          onClick={() => setFilterType('income')}
+          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${filterType === 'income' ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20'}`}
+        >
+          Receitas
+        </button>
+        <button
+          onClick={() => setFilterType('expense')}
+          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${filterType === 'expense' ? 'bg-rose-500 text-white' : 'bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20'}`}
+        >
+          Despesas
+        </button>
+        <button
+          onClick={() => setFilterType('transfer')}
+          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${filterType === 'transfer' ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20'}`}
+        >
+          Transferências
+        </button>
+        <button
+          onClick={() => setFilterType('pending')}
+          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${filterType === 'pending' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20'}`}
+        >
+          Futuros / Pendentes
+        </button>
       </div>
 
       <div className="space-y-6">

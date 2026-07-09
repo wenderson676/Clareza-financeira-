@@ -176,7 +176,7 @@ export function Planning({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Financial Mode Diagnostic */}
-            <div className={`p-6 rounded-3xl border ${modeStyles[diagnosis.mode].border} ${modeStyles[diagnosis.mode].bg} space-y-4 shadow-sm`}>
+            <div id="planning-diagnosis" className={`p-6 rounded-3xl border ${modeStyles[diagnosis.mode].border} ${modeStyles[diagnosis.mode].bg} space-y-4 shadow-sm`}>
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fase Financeira Atual</span>
@@ -389,8 +389,31 @@ export function Planning({
                       {c.type === 'oportunidade' && '🎯'}
                       {c.type === 'aviso' && 'ℹ️'}
                     </span>
-                    <div className="space-y-0.5">
-                      <span className="text-[9px] font-extrabold text-slate-400 block uppercase">{c.category}</span>
+                    <div className="space-y-0.5 w-full">
+                      <div className="flex justify-between items-start">
+                        <span className="text-[9px] font-extrabold text-slate-400 block uppercase">{c.category}</span>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                            c.status === 'realizado' ? 'bg-emerald-100 text-emerald-700' :
+                            c.status === 'atrasado' ? 'bg-rose-100 text-rose-700' :
+                            c.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                            c.status === 'planejado' ? 'bg-indigo-100 text-indigo-700' :
+                            'bg-slate-100 text-slate-500'
+                          }`}>
+                            {c.status}
+                          </span>
+                          {c.confidence && (
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                              c.confidence === 'confirmado' ? 'bg-emerald-100 text-emerald-700' :
+                              c.confidence === 'alta' ? 'bg-blue-100 text-blue-700' :
+                              c.confidence === 'media' ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-500'
+                            }`}>
+                              {c.confidence} conf.
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <p className="text-slate-700 dark:text-slate-300 font-semibold">{c.text}</p>
                       {c.amount && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
@@ -404,7 +427,33 @@ export function Planning({
             </div>
           )}
 
-
+          {/* Recurrence Patterns */}
+          {diagnosis.recurrences.length > 0 && (
+            <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <RefreshCw size={12} className="text-emerald-500" />
+                Padrões e Recorrências Detectadas
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {diagnosis.recurrences.map((r, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex flex-col gap-1 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-extrabold text-slate-500 block uppercase">{r.category}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 uppercase">
+                        {r.frequency}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                      Média: {formatBRL(r.averageAmount)}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                      {r.suggestedAction}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Structured Interactive Action Plan */}
           <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-5">

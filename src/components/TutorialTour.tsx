@@ -51,6 +51,13 @@ export function TutorialTour({
       tab: 'dashboard',
     },
     {
+      title: '📝 Diário Financeiro',
+      description: 'Você pode usar este espaço para refletir sobre o mês ou anotar lembretes ("preciso pagar a luz", "vou receber 500 sexta"). Nosso motor inteligente lê essas anotações para prever seu futuro!',
+      targetId: 'dashboard-reflexao',
+      placement: 'top',
+      tab: 'dashboard',
+    },
+    {
       title: '➕ Registrar Lançamentos',
       description: 'Este botão verde flutuante no centro é onde tudo acontece! Toque nele para registrar receitas, despesas ou realizar transferências de forma super rápida.',
       targetId: 'nav-add-btn',
@@ -58,16 +65,16 @@ export function TutorialTour({
     },
     {
       title: '📜 Extrato Completo e Filtros',
-      description: 'Na aba Extrato você visualiza o histórico detalhado dos seus lançamentos, pesquisa termos específicos e filtra por categorias para ver onde gastou.',
-      targetId: 'nav-transactions',
-      placement: 'top',
+      description: 'Na aba Extrato você visualiza o histórico detalhado dos seus lançamentos. Agora você pode pesquisar por texto livre e usar os filtros rápidos de categoria.',
+      targetId: 'transactions-filters',
+      placement: 'bottom',
       tab: 'transactions',
     },
     {
-      title: '🎯 Metas e Reserva Financeira',
-      description: 'Na aba Contador, crie e acompanhe suas metas de economia (reserva de emergência, viagens) e controle suas dívidas com facilidade.',
-      targetId: 'nav-planning',
-      placement: 'top',
+      title: '🎯 O Copiloto Financeiro',
+      description: 'A aba Contador evoluiu! Ela agora lê suas metas, dívidas e anotações do diário para gerar um diagnóstico completo da sua Fase Financeira e do seu Risco atual.',
+      targetId: 'planning-diagnosis',
+      placement: 'bottom',
       tab: 'planning',
     },
     {

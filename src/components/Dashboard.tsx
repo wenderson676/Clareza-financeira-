@@ -1245,7 +1245,7 @@ export function Dashboard({
   );
 
   const renderReflexao = () => (
-    <div key="reflexao" className="glass-card p-6 animate-fade-in">
+    <div key="reflexao" id="dashboard-reflexao" className="glass-card p-6 animate-fade-in">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
           <Lightbulb size={22} className="animate-pulse" />
