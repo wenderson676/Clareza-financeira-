@@ -69,7 +69,7 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts
     });
     
     return groups;
-  }, [data.transactions, searchTerm]);
+  }, [data.transactions, searchTerm, filterType]);
 
   return (
     <div className="pb-24">
