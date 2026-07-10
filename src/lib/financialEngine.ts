@@ -60,6 +60,7 @@ export interface FinancialDiagnosis {
     next90Days: string[];
   };
   insights: string[];
+  recommendedBudgetMode?: string;
 }
 
 /**
@@ -608,6 +609,16 @@ export function generateFinancialDiagnosis(
     actionPlan.next90Days.push('Manter o hábito de registrar tudo para consolidar seu histórico financeiro de 3 meses e destravar projeções mais precisas.');
   }
 
+  let recommendedBudgetMode = '50-30-20';
+  if (mode === 'Crise') recommendedBudgetMode = '90-5-5';
+  else if (mode === 'Sobrevivência') {
+    recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '80-10-10';
+  } else if (mode === 'Estabilização') {
+    recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '50-30-20';
+  } else if (mode === 'Expansão' || mode === 'Multiplicação') {
+    recommendedBudgetMode = '50-20-30';
+  }
+
   return {
     mode,
     riskLevel,
@@ -631,7 +642,8 @@ export function generateFinancialDiagnosis(
     projections,
     recurrences,
     actionPlan,
-    insights
+    insights,
+    recommendedBudgetMode
   };
 }
 

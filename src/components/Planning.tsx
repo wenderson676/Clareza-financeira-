@@ -196,6 +196,23 @@ export function Planning({
                 <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
                   {diagnosis.recommendation}
                 </p>
+                {diagnosis.recommendedBudgetMode && diagnosis.recommendedBudgetMode !== budgetMode && (
+                  <div className="mt-3 p-3 bg-white/50 dark:bg-slate-950/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs text-slate-600 dark:text-slate-400">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Recomendação de Configuração:</span> O modelo financeiro identificou que seu momento requer a distribuição <span className="font-bold text-indigo-600 dark:text-indigo-400">{
+                      diagnosis.recommendedBudgetMode === '90-5-5' ? 'Crise (90/5/5)' :
+                      diagnosis.recommendedBudgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
+                      diagnosis.recommendedBudgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
+                      diagnosis.recommendedBudgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
+                      'Padrão (50/30/20)'
+                    }</span>, mas você está operando em <b>{
+                      budgetMode === '90-5-5' ? 'Crise (90/5/5)' :
+                      budgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
+                      budgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
+                      budgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
+                      'Padrão (50/30/20)'
+                    }</b>. Para alterar, use a configuração de Divisão de Orçamento (ícone de alvo).
+                  </div>
+                )}
               </div>
             </div>
 
