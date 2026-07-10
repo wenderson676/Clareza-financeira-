@@ -517,24 +517,32 @@ export function generateFinancialDiagnosis(
   const noteExpenses = globalCommitments.filter(c => c.source === 'nota_geral' && (c.type === 'despesa' || c.type === 'divida'));
   const noteIncomes = globalCommitments.filter(c => c.source === 'nota_geral' && c.type === 'receita');
 
+  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
   // Trigger-based Recommendations
   if (hasLateDebts) {
-    recommendation = 'Atrasos detectados. Priorize renegociação imediata e congele gastos com Desejos.';
-    insights.push('Atrasos geram juros compostos que destroem o patrimônio rapidamente.');
+    const totalLate = debts.filter(d => d.isLate).reduce((acc, d) => acc + d.totalAmount, 0);
+    const suggestedAction = monthlySurplus > 0 ? `Sugestão: Destine 100% da sua sobra líquida (${formatBRL(monthlySurplus)}) para abater as parcelas em atraso.` : `Sugestão: Congele gastos com Desejos imediatamente para recuperar o caixa.`;
+    recommendation = `Atrasos detectados. Priorize renegociação imediata para estancar os juros. ${suggestedAction}`;
+    insights.push(`Você possui ${formatBRL(totalLate)} em dívidas atrasadas. Atrasos geram juros compostos que destroem o patrimônio rapidamente.`);
   } else if (cashFlowPressure30D > 90) {
-    recommendation = 'Pressão de caixa perigosa. Crie um teto semanal para gastos variáveis e evite novas parcelas.';
-    insights.push(`Sua pressão de caixa para 30 dias está em ${cashFlowPressure30D.toFixed(0)}%. O dinheiro atual está quase todo comprometido.`);
+    const weeklyCap = adjustedIncome > 0 ? (adjustedIncome * 0.1) / 4 : 100;
+    recommendation = `Pressão de caixa perigosa (${cashFlowPressure30D.toFixed(0)}%). Crie um teto para gastos variáveis. Sugestão: Limite desejos e lazer a ${formatBRL(weeklyCap)} por semana.`;
+    insights.push(`O dinheiro atual está quase todo comprometido. Evite qualquer nova parcela de cartão de crédito neste ciclo.`);
   } else if (totalDebtAmount > 0 && dtiRatio > 30) {
-    recommendation = 'Dívida cara detectada. Ataque a de maior juros primeiro e evite novas parcelas.';
-    insights.push('Reduzir o endividamento mensal liberará espaço vital no seu orçamento.');
+    const focusAmount = adjustedIncome * 0.2;
+    recommendation = `Endividamento alto consumindo sua renda. Ataque a dívida com maior juros primeiro. Sugestão: Separe ${formatBRL(focusAmount)} (20% da renda) focado apenas em amortizações extras.`;
+    insights.push(`Sua parcela total de dívidas compromete ${dtiRatio.toFixed(1)}% do orçamento. Reduzir esse índice é prioridade máxima.`);
   } else if (biggestDrain && fixedOverheadIndex < 70 && mode !== 'Expansão') {
-    recommendation = 'Gasto impulsivo detectado. Crie um teto semanal e bloqueie novas compras até normalizar.';
-    insights.push(`O excesso em "${biggestDrain}" está limitando sua capacidade de poupança.`);
+    const drainWeeklyCap = adjustedIncome > 0 ? (adjustedIncome * 0.05) / 4 : 50;
+    recommendation = `Gasto impulsivo detectado na categoria "${biggestDrain}". Sugestão: Adicione um teto de gasto semanal de ${formatBRL(drainWeeklyCap)} para esta categoria até normalizar.`;
+    insights.push(`O excesso recente em "${biggestDrain}" está corroendo silenciosamente sua capacidade de poupança.`);
   } else if (savingsRate > 20 && runwayMonths > 3) {
-    recommendation = 'Sobra consistente detectada. Automatize sua reserva mensal e estude migrar para investimentos de maior prazo.';
-    insights.push('Você já possui uma base sólida. O próximo passo é fazer o dinheiro trabalhar sozinho.');
+    const autoSave = adjustedIncome * 0.2;
+    recommendation = `Sobra consistente! Você acumulou ${formatBRL(monthlySurplus)} de excedente este mês. Sugestão: Automatize a transferência de ${formatBRL(autoSave / 4)} por semana para investimentos.`;
+    insights.push(`Você já possui uma base sólida com ${runwayMonths.toFixed(1)} meses de sobrevida financeira. Faça o dinheiro trabalhar para você.`);
   } else {
-    recommendation = `Manter estabilidade. Você está na fase de ${mode}. Continue registrando tudo.`;
+    recommendation = `Manter estabilidade. Você está na fase de ${mode}. Sugestão: Para acelerar, tente otimizar os gastos correntes de "${topExpenseCategories[0] || 'Diversos'}".`;
   }
 
   // Today's actions
@@ -544,12 +552,13 @@ export function generateFinancialDiagnosis(
   }
   
   if (biggestDrain) {
-    actionPlan.today.push(`Colocar um limite rígido hoje na categoria "${biggestDrain}" para evitar o esvaziamento do seu caixa.`);
+    const drainWeeklyCap = adjustedIncome > 0 ? (adjustedIncome * 0.05) / 4 : 50;
+    actionPlan.today.push(`Colocar um limite rígido hoje na categoria "${biggestDrain}". Teto sugerido: ${formatBRL(drainWeeklyCap)} por semana.`);
   }
 
   noteExpenses.forEach(c => {
     if (c.amount && c.amount > 150 && c.status === 'pendente') {
-      actionPlan.today.push(`Garantir a separação de R$ ${c.amount.toFixed(2)} para o compromisso futuro anotado: "${c.text}".`);
+      actionPlan.today.push(`Garantir a separação de ${formatBRL(c.amount)} para o compromisso futuro anotado: "${c.text}".`);
     }
   });
 
@@ -560,7 +569,7 @@ export function generateFinancialDiagnosis(
   // Next 7 days actions
   if (activeDebts.length > 0) {
     const firstDebt = activeDebts[0];
-    actionPlan.next7Days.push(`Avaliar uma proposta de amortização ou quitação antecipada da dívida "${firstDebt.name}".`);
+    actionPlan.next7Days.push(`Simular uma proposta de amortização ou quitação antecipada da dívida "${firstDebt.name}" (Saldo: ${formatBRL(firstDebt.totalAmount)}).`);
   }
 
   noteIncomes.forEach(c => {
@@ -571,7 +580,8 @@ export function generateFinancialDiagnosis(
 
   if (activeGoals.length > 0) {
     const firstGoal = activeGoals[0];
-    actionPlan.next7Days.push(`Transferir qualquer sobra desta semana para acelerar a meta de economia "${firstGoal.title}".`);
+    const missing = firstGoal.targetAmount - firstGoal.currentAmount;
+    actionPlan.next7Days.push(`Transferir qualquer sobra desta semana para acelerar a meta "${firstGoal.title}" (Faltam ${formatBRL(missing)}).`);
   }
 
   if (actionPlan.next7Days.length === 0) {
@@ -580,13 +590,16 @@ export function generateFinancialDiagnosis(
 
   // Next 30 days actions
   if (activeDebts.length > 1) {
-    actionPlan.next30Days.push(`Organizar as parcelas do próximo mês, com foco especial na dívida "${activeDebts[1].name}".`);
+    actionPlan.next30Days.push(`Organizar as parcelas do próximo mês, mirando reduzir a dívida "${activeDebts[1].name}" em pelo menos 10%.`);
   } else if (activeDebts.length === 1) {
-    actionPlan.next30Days.push(`Tentar poupar uma quantia extra este mês para abater o saldo devedor de "${activeDebts[0].name}".`);
+    const extraTarget = Math.max(50, adjustedIncome * 0.05);
+    actionPlan.next30Days.push(`Tentar gerar ${formatBRL(extraTarget)} de renda extra ou economia para abater o saldo devedor de "${activeDebts[0].name}".`);
   }
 
   if (activeGoals.length > 1) {
-    actionPlan.next30Days.push(`Dividir as sobras do mês de forma equilibrada para impulsionar a meta "${activeGoals[1].title}".`);
+    const secondGoal = activeGoals[1];
+    const target = Math.max(20, (secondGoal.targetAmount - secondGoal.currentAmount) * 0.2);
+    actionPlan.next30Days.push(`Destinar pelo menos ${formatBRL(target)} das sobras do mês para impulsionar a meta "${secondGoal.title}".`);
   }
 
   globalCommitments.filter(c => c.type === 'oportunidade').forEach(c => {
@@ -599,10 +612,16 @@ export function generateFinancialDiagnosis(
 
   // Next 90 days actions
   if (activeGoals.length > 0) {
-    actionPlan.next90Days.push(`Revisar o progresso das suas metas de poupança, mirando concluir a meta "${activeGoals[0].title}".`);
+    const firstGoal = activeGoals[0];
+    const missing = firstGoal.targetAmount - firstGoal.currentAmount;
+    const monthlyTarget = missing / 3;
+    actionPlan.next90Days.push(`Manter aportes de aprox. ${formatBRL(monthlyTarget)}/mês para concluir a meta "${firstGoal.title}" neste trimestre.`);
   }
+
   if (activeDebts.length > 0) {
-    actionPlan.next90Days.push('Buscar reduzir o seu endividamento total e renegociar juros altos para proteger o patrimônio.');
+    const totalD = activeDebts.reduce((sum, d) => sum + d.totalAmount, 0);
+    const targetReduction = totalD * 0.3;
+    actionPlan.next90Days.push(`Renegociar juros e buscar reduzir seu endividamento total em pelo menos 30% (aprox. ${formatBRL(targetReduction)}).`);
   }
 
   if (actionPlan.next90Days.length === 0) {
@@ -615,7 +634,7 @@ export function generateFinancialDiagnosis(
     recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '80-10-10';
   } else if (mode === 'Estabilização') {
     recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '50-30-20';
-  } else if (mode === 'Expansão' || mode === 'Multiplicação') {
+  } else if (mode === 'Expansão' || mode === 'Construção') {
     recommendedBudgetMode = '50-20-30';
   }
 
