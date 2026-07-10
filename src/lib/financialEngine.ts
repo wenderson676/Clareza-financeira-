@@ -443,10 +443,9 @@ export function generateFinancialDiagnosis(
   const projections: FinancialProjection[] = [];
   const monthNames = ['Mês Atual', 'Mês que vem (Projeção)', 'Daqui a 2 Meses (Projeção)'];
   
-  const hasFutureAnnotations = globalCommitments.some(c => c.source === 'nota_geral');
-  const hasDebts = debts.length > 0;
-  const hasGoals = goals.length > 0;
-  
+  let recIncome = recurrences.filter(r => r.type === 'income').reduce((sum, r) => sum + r.averageAmount, 0);
+  let recExpense = recurrences.filter(r => r.type === 'expense').reduce((sum, r) => sum + r.averageAmount, 0);
+
   let tempBalance = currentBalance;
   for (let i = 0; i < 3; i++) {
     if (i === 0) {
@@ -457,36 +456,23 @@ export function generateFinancialDiagnosis(
         projectedBalance: currentBalance
       });
     } else {
-      if (hasDebts || hasFutureAnnotations || hasGoals) {
-        let pIncome = 0;
-        globalCommitments.forEach(c => {
-          if (c.type === 'receita' && c.amount) {
-            pIncome += c.amount;
-          }
-        });
-        
-        let pExpense = totalDebtMonthly;
-        globalCommitments.forEach(c => {
-          if ((c.type === 'despesa' || c.type === 'divida') && c.amount) {
-            pExpense += c.amount;
-          }
-        });
-        
-        tempBalance += (pIncome - pExpense);
-        projections.push({
-          period: monthNames[i],
-          projectedIncome: pIncome,
-          projectedExpense: pExpense,
-          projectedBalance: tempBalance
-        });
-      } else {
-        projections.push({
-          period: monthNames[i],
-          projectedIncome: 0,
-          projectedExpense: 0,
-          projectedBalance: 0
-        });
+      let pIncome = recIncome > 0 ? recIncome : adjustedIncome;
+      let pExpense = recExpense > 0 ? recExpense : adjustedExpenses;
+      
+      // Add debt payments if they are not already in recurring expenses
+      if (recExpense === 0) {
+         // If using adjustedExpenses, it already includes current month's expenses. Let's assume debts are already in there or will be paid.
+         // But just to be safe and conservative, if totalDebtMonthly is large, ensure we account for it.
+         pExpense = Math.max(pExpense, totalDebtMonthly);
       }
+      
+      tempBalance += (pIncome - pExpense);
+      projections.push({
+        period: monthNames[i],
+        projectedIncome: pIncome,
+        projectedExpense: pExpense,
+        projectedBalance: tempBalance
+      });
     }
   }
 

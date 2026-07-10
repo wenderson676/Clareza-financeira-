@@ -210,17 +210,17 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     } else if (formTab === 'transfer') {
       if (transferFrom === 'banco' && transferTo === 'reserva') {
         finalType = 'transfer_to_savings';
-        finalCategory = 'Transferência para Reserva/Dívidas';
+        finalCategory = category || 'Transferência para Reserva/Dívidas';
         finalAccount = 'banco';
         finalToAccount = undefined;
       } else if (transferFrom === 'reserva' && transferTo === 'banco') {
         finalType = 'transfer_from_savings';
-        finalCategory = 'Resgate de Reserva/Dívidas';
+        finalCategory = category || 'Resgate de Reserva/Dívidas';
         finalAccount = 'banco';
         finalToAccount = undefined;
       } else {
         finalType = 'transfer_between_accounts';
-        finalCategory = `Transferência de ${transferFrom} para ${transferTo}`;
+        finalCategory = category || `Transferência de ${transferFrom} para ${transferTo}`;
         finalAccount = transferFrom;
         finalToAccount = transferTo;
       }

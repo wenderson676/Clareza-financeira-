@@ -773,15 +773,15 @@ export function Dashboard({
       <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-4">Análise Mensal (Inclui Lançamentos Futuros)</h2>
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Saldo</div>
-          <div className="font-bold text-slate-800 dark:text-slate-200 text-sm sm:text-base">{formatCurrency(projectedBalance)}</div>
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Receitas</div>
+          <div className="font-bold text-emerald-600 dark:text-emerald-400 text-sm sm:text-base">{formatCurrency(projectedIncome)}</div>
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
           <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Prev. Gastos</div>
           <div className="font-bold text-rose-600 dark:text-rose-400 text-sm sm:text-base">{formatCurrency(projectedExpenses)}</div>
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Balanço Final</div>
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Previsão de Saldo</div>
           <div className={`font-bold text-sm sm:text-base ${projectedBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
             {projectedBalance >= 0 ? '+' : ''}{formatCurrency(projectedBalance)}
           </div>
