@@ -146,40 +146,21 @@ export function Dashboard({
     .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending)
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const isReserva = (id?: string) => id === 'reserva' || accounts.find(a => a.id === id)?.type === 'reserva';
+
   const netTransfersToSavings = data.transactions
     .filter(t => !t.isPending)
     .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+      const act = t.account || 'banco';
+      const toAct = t.toAccount;
+      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
         return sum + t.amount;
       }
-      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
+      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && isReserva(act) && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && isReserva(act))) {
         return sum - t.amount;
       }
       return sum;
     }, 0);
-
-  const currentBalance = previousBalance + totalIncome - totalExpenses - netTransfersToSavings;
-
-  const projectedIncome = data.transactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const projectedExpenses = data.transactions
-    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const projectedNetTransfersToSavings = data.transactions
-    .reduce((sum, t) => {
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
-        return sum + t.amount;
-      }
-      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
-        return sum - t.amount;
-      }
-      return sum;
-    }, 0);
-
-  const projectedBalance = previousBalance + projectedIncome - projectedExpenses - projectedNetTransfersToSavings;
 
   const accountBalances = useMemo(() => {
     const balances: Record<string, number> = {};
@@ -191,16 +172,13 @@ export function Dashboard({
     if (balances['carteira'] === undefined) balances['carteira'] = 0;
 
     const sortedMonthIds = Object.keys(allData).sort();
-
     for (const mId of sortedMonthIds) {
       if (mId > data.monthId) continue;
-
       const month = allData[mId];
       if (!month || !month.transactions) continue;
 
       for (const t of month.transactions) {
         if (t.isPending) continue;
-
         const amt = t.amount;
         const act = t.account || 'banco';
 
@@ -211,19 +189,10 @@ export function Dashboard({
             balances['banco'] += amt;
           }
         } else if (t.type === 'expense') {
-          if (t.bucket === 'Reserva/Dívidas') {
-            if (balances[act] !== undefined) {
-              balances[act] -= amt;
-            } else {
-              balances['banco'] -= amt;
-            }
-            balances['reserva'] += amt;
+          if (balances[act] !== undefined) {
+            balances[act] -= amt;
           } else {
-            if (balances[act] !== undefined) {
-              balances[act] -= amt;
-            } else {
-              balances['banco'] -= amt;
-            }
+            balances['banco'] -= amt;
           }
         } else if (t.type === 'transfer_to_savings') {
           if (balances[act] !== undefined) {
@@ -249,9 +218,50 @@ export function Dashboard({
         }
       }
     }
-
     return balances;
   }, [allData, data.monthId, accounts]);
+
+  const currentBalance = accounts.reduce((sum, acc) => (acc.id !== 'reserva' && acc.type !== 'reserva') ? sum + (accountBalances[acc.id] || 0) : sum, 0) + (accounts.find(a => a.id === 'banco') ? 0 : (accountBalances['banco'] || 0)) + (accounts.find(a => a.id === 'carteira') ? 0 : (accountBalances['carteira'] || 0));
+
+  const projectedIncome = data.transactions
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const projectedExpenses = data.transactions
+    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const projectedBalance = useMemo(() => {
+    let balance = currentBalance;
+    const sortedMonthIds = Object.keys(allData).sort();
+    for (const mId of sortedMonthIds) {
+      if (mId > data.monthId) continue;
+      const month = allData[mId];
+      if (!month || !month.transactions) continue;
+      
+      for (const t of month.transactions) {
+        if (!t.isPending) continue;
+        
+        const amt = t.amount;
+        const act = t.account || 'banco';
+        const toAct = t.toAccount;
+        
+        if (t.type === 'income' && !isReserva(act)) {
+          balance += amt;
+        } else if (t.type === 'expense' && !isReserva(act)) {
+          balance -= amt;
+        } else if (t.type === 'transfer_to_savings' && !isReserva(act)) {
+          balance -= amt;
+        } else if (t.type === 'transfer_from_savings' && !isReserva(act)) {
+          balance += amt;
+        } else if (t.type === 'transfer_between_accounts') {
+          if (!isReserva(act)) balance -= amt;
+          if (toAct && !isReserva(toAct)) balance += amt;
+        }
+      }
+    }
+    return balance;
+  }, [allData, data.monthId, currentBalance, accounts]);
 
   const raioX = useMemo(() => {
     const savingsRatio = totalIncome > 0 ? (netTransfersToSavings / totalIncome) : 0;
@@ -1160,10 +1170,12 @@ export function Dashboard({
             Object.values(allData).reduce((sum, month) => {
               return sum + month.transactions.reduce((mSum, t) => {
                 if (t.isPending) return mSum;
-                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && t.account === 'reserva') || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+                const act = t.account || 'banco';
+                const toAct = t.toAccount;
+                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
                   return mSum + t.amount;
                 }
-                if (t.type === 'transfer_from_savings' || (t.type === 'expense' && t.account === 'reserva' && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && t.account === 'reserva')) {
+                if (t.type === 'transfer_from_savings' || (t.type === 'expense' && isReserva(act) && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && isReserva(act))) {
                   return mSum - t.amount;
                 }
                 return mSum;
@@ -1323,10 +1335,12 @@ export function Dashboard({
   return (
     <div className="space-y-6 pb-24">
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
-        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Saldo Total</h2>
+        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+          {projectedBalance !== currentBalance ? 'Saldo Total Projetado' : 'Saldo Total'}
+        </h2>
         <div className="flex justify-center items-center gap-3 mt-1 mb-6">
-          <span className={`text-5xl font-black tracking-tight ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-            {formatCurrency(currentBalance)}
+          <span className={`text-5xl font-black tracking-tight ${projectedBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+            {formatCurrency(projectedBalance)}
           </span>
         </div>
         

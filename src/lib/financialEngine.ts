@@ -258,12 +258,14 @@ export function generateFinancialDiagnosis(
   goals: Goal[],
   accounts: Account[]
 ): FinancialDiagnosis {
-  // 0. Aggregate data across all months
+  // 0. Aggregate data across months (up to the current month)
   let allTxs: Transaction[] = [];
   let allNotes = '';
   Object.values(allData).forEach(mData => {
-    if (mData.transactions) allTxs = allTxs.concat(mData.transactions);
-    if (mData.devotionalNote) allNotes += mData.devotionalNote + '\n';
+    if (mData.monthId <= currentMonthData.monthId) {
+      if (mData.transactions) allTxs = allTxs.concat(mData.transactions);
+      if (mData.devotionalNote) allNotes += mData.devotionalNote + '\n';
+    }
   });
 
   const txs = currentMonthData.transactions || [];
@@ -281,24 +283,27 @@ export function generateFinancialDiagnosis(
   // 2. Account balances & net worth
   let bancoBal = 0;
   let reservaBal = 0;
+  
+  const isReserva = (id?: string) => id === 'reserva' || accounts.find(a => a.id === id)?.type === 'reserva';
+
   allTxs.filter(t => !t.isPending).forEach(t => {
     const amt = t.amount;
     const act = t.account || 'banco';
+    const toAct = t.toAccount;
     
     if (t.type === 'income') {
-      if (act === 'reserva') reservaBal += amt; else bancoBal += amt;
+      if (isReserva(act)) reservaBal += amt; else bancoBal += amt;
     } else if (t.type === 'expense') {
-      if (act === 'reserva') reservaBal -= amt; else bancoBal -= amt;
-      if (t.bucket === 'Reserva/Dívidas') reservaBal += amt;
-    } else if (t.type === 'transfer_to_savings' || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
-      if (act === 'reserva') reservaBal -= amt; else bancoBal -= amt;
+      if (isReserva(act)) reservaBal -= amt; else bancoBal -= amt;
+    } else if (t.type === 'transfer_to_savings') {
+      if (isReserva(act)) reservaBal -= amt; else bancoBal -= amt;
       reservaBal += amt;
     } else if (t.type === 'transfer_from_savings') {
       reservaBal -= amt;
       bancoBal += amt;
-    } else if (t.type === 'transfer_between_accounts' && act === 'reserva') {
-      reservaBal -= amt;
-      bancoBal += amt;
+    } else if (t.type === 'transfer_between_accounts') {
+      if (isReserva(act)) reservaBal -= amt; else bancoBal -= amt;
+      if (isReserva(toAct)) reservaBal += amt; else bancoBal += amt;
     }
   });
 
@@ -466,14 +471,36 @@ export function generateFinancialDiagnosis(
   let recIncome = recurrences.filter(r => r.type === 'income').reduce((sum, r) => sum + r.averageAmount, 0);
   let recExpense = recurrences.filter(r => r.type === 'expense').reduce((sum, r) => sum + r.averageAmount, 0);
 
-  let tempBalance = currentBalance;
+  let pendingImpact = 0;
+  allTxs.filter(t => t.isPending).forEach(t => {
+    const amt = t.amount;
+    const act = t.account || 'banco';
+    const toAct = t.toAccount;
+    
+    if (t.type === 'income' && !isReserva(act)) {
+      pendingImpact += amt;
+    } else if (t.type === 'expense' && !isReserva(act)) {
+      pendingImpact -= amt;
+    } else if (t.type === 'transfer_to_savings' && !isReserva(act)) {
+      pendingImpact -= amt;
+    } else if (t.type === 'transfer_from_savings' && !isReserva(act)) {
+      pendingImpact += amt;
+    } else if (t.type === 'transfer_between_accounts') {
+      if (!isReserva(act)) pendingImpact -= amt;
+      if (toAct && !isReserva(toAct)) pendingImpact += amt;
+    }
+  });
+
+  const projectedBalanceM0 = currentBalance + pendingImpact + additionalUnregisteredIncome - additionalUnregisteredExpenses;
+
+  let tempBalance = projectedBalanceM0;
   for (let i = 0; i < 3; i++) {
     if (i === 0) {
       projections.push({
         period: monthNames[i],
         projectedIncome: adjustedIncome,
         projectedExpense: adjustedExpenses,
-        projectedBalance: currentBalance
+        projectedBalance: projectedBalanceM0
       });
     } else {
       let pIncome = recIncome > 0 ? recIncome : adjustedIncome;

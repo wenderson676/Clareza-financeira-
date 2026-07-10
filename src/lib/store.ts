@@ -51,19 +51,6 @@ export function useStore() {
       const prevData = prev.monthlyData[prevMonthId];
       
       let newTransactions: Transaction[] = [];
-      
-      if (prevData && prevData.transactions.length > 0) {
-        newTransactions = prevData.transactions.map(t => {
-          const tDate = new Date(t.date + 'T00:00:00');
-          const newDate = new Date(tDate.getFullYear(), tDate.getMonth() + 1, tDate.getDate());
-          return {
-            ...t,
-            id: crypto.randomUUID(),
-            date: format(newDate, 'yyyy-MM-dd'),
-            isPending: true
-          };
-        });
-      }
 
       return {
         ...prev,
@@ -114,19 +101,10 @@ export function useStore() {
             balances['banco'] += amt;
           }
         } else if (t.type === 'expense') {
-          if (t.bucket === 'Reserva/Dívidas') {
-            if (balances[act] !== undefined) {
-              balances[act] -= amt;
-            } else {
-              balances['banco'] -= amt;
-            }
-            balances['reserva'] += amt;
+          if (balances[act] !== undefined) {
+            balances[act] -= amt;
           } else {
-            if (balances[act] !== undefined) {
-              balances[act] -= amt;
-            } else {
-              balances['banco'] -= amt;
-            }
+            balances['banco'] -= amt;
           }
         } else if (t.type === 'transfer_to_savings') {
           if (balances[act] !== undefined) {
@@ -160,17 +138,24 @@ export function useStore() {
     let balance = 0;
     const targetDate = parse(targetMonthId, 'yyyy-MM', new Date());
     
+    const isReserva = (id?: string) => id === 'reserva' || state.accounts?.find(a => a.id === id)?.type === 'reserva';
+
     Object.values(state.monthlyData).forEach((month: any) => {
       const monthDate = parse(month.monthId, 'yyyy-MM', new Date());
       if (monthDate < targetDate) {
         month.transactions.filter((t: any) => !t.isPending).forEach((t: any) => {
-          if (t.type === 'income') balance += t.amount;
-          if (t.type === 'expense') balance -= t.amount;
-          if (t.type === 'transfer_to_savings') balance -= t.amount;
-          if (t.type === 'transfer_from_savings') balance += t.amount;
-          if (t.type === 'transfer_between_accounts') {
-            if (t.toAccount === 'reserva') balance -= t.amount;
-            else if (t.account === 'reserva') balance += t.amount;
+          const act = t.account || 'banco';
+          const toAct = t.toAccount;
+          if (t.type === 'income') {
+            if (!isReserva(act)) balance += t.amount;
+          } else if (t.type === 'expense') {
+            if (!isReserva(act)) balance -= t.amount;
+          } else if (t.type === 'transfer_to_savings' || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
+            if (!isReserva(act)) balance -= t.amount;
+          } else if (t.type === 'transfer_from_savings') {
+            if (!isReserva(act)) balance += t.amount;
+          } else if (t.type === 'transfer_between_accounts' && isReserva(act) && !isReserva(toAct)) {
+            balance += t.amount;
           }
         });
       }
