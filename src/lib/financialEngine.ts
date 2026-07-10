@@ -279,12 +279,31 @@ export function generateFinancialDiagnosis(
   const totalExpenses = realizedExpenses + pendingExpenses;
 
   // 2. Account balances & net worth
-  const currentBalance = accounts.reduce((acc, a) => {
-    // Look up real account balances if tracked, or default to previous + current month flow
-    return acc + (a.id === 'reserva' ? 0 : 0); // we will use previousBalance + realized income/expense
-  }, 0) || (previousBalance + realizedIncome - realizedExpenses);
+  let bancoBal = 0;
+  let reservaBal = 0;
+  allTxs.filter(t => !t.isPending).forEach(t => {
+    const amt = t.amount;
+    const act = t.account || 'banco';
+    
+    if (t.type === 'income') {
+      if (act === 'reserva') reservaBal += amt; else bancoBal += amt;
+    } else if (t.type === 'expense') {
+      if (act === 'reserva') reservaBal -= amt; else bancoBal -= amt;
+      if (t.bucket === 'Reserva/Dívidas') reservaBal += amt;
+    } else if (t.type === 'transfer_to_savings' || (t.type === 'transfer_between_accounts' && t.toAccount === 'reserva')) {
+      if (act === 'reserva') reservaBal -= amt; else bancoBal -= amt;
+      reservaBal += amt;
+    } else if (t.type === 'transfer_from_savings') {
+      reservaBal -= amt;
+      bancoBal += amt;
+    } else if (t.type === 'transfer_between_accounts' && act === 'reserva') {
+      reservaBal -= amt;
+      bancoBal += amt;
+    }
+  });
 
-  const totalSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0) + (accounts.find(a => a.id === 'reserva') ? previousBalance : 0);
+  const currentBalance = bancoBal;
+  const totalSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0) + reservaBal;
   const totalAssets = Math.max(0, currentBalance) + totalSaved;
 
   // 3. Debt metrics
