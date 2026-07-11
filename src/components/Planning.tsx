@@ -219,7 +219,8 @@ export function Planning({
                   <AlertTriangle className="text-rose-500" size={14} /> Principal Gargalo / Alerta
                 </h4>
                 <p className="text-xs font-bold text-rose-700 dark:text-rose-400 leading-relaxed bg-rose-50 dark:bg-rose-950/10 p-3 rounded-2xl border border-rose-100 dark:border-rose-900/20">
-                  {diagnosis.mainProblem}
+                  <strong className="block font-black uppercase tracking-wider text-[10px] mb-1 text-rose-800 dark:text-rose-300">{diagnosis.mainProblem?.title}</strong>
+                  <span className="font-medium">{diagnosis.mainProblem?.desc}</span>
                 </p>
               </div>
 
