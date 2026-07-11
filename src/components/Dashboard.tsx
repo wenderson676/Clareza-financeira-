@@ -1336,24 +1336,42 @@ export function Dashboard({
     <div className="space-y-6 pb-24">
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
         <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-          {projectedBalance !== currentBalance ? 'Saldo Total Projetado' : 'Saldo Total'}
+          Saldo Atual
         </h2>
         <div className="flex justify-center items-center gap-3 mt-1 mb-6">
-          <span className={`text-5xl font-black tracking-tight ${projectedBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-            {formatCurrency(projectedBalance)}
+          <span className={`text-5xl font-black tracking-tight ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+            {formatCurrency(currentBalance)}
           </span>
         </div>
         
-        <div className="space-y-3">
-          <div className="flex gap-4 text-sm">
-            <div className="flex-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 p-3 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-left">
-              <div className="text-xs mb-1 opacity-80">Entrada</div>
-              <div className="font-bold">{formatCurrency(totalIncome)}</div>
+        <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Inicial</div>
+            <div className={`font-black text-xs sm:text-sm ${previousBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {formatCurrency(previousBalance)}
             </div>
-            <div className="flex-1 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 p-3 rounded-xl border border-rose-100 dark:border-rose-500/20 text-left">
-              <div className="text-xs mb-1 opacity-80">Saída</div>
-              <div className="font-bold">{formatCurrency(totalExpenses)}</div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Saldo</div>
+            <div className={`font-black text-xs sm:text-sm ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+              {formatCurrency(currentBalance)}
             </div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Previsão</div>
+            <div className={`font-black text-xs sm:text-sm ${projectedBalance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {formatCurrency(projectedBalance)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-4 text-xs mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 justify-around text-slate-500 dark:text-slate-400">
+          <div>
+            Entradas: <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(totalIncome)}</span>
+          </div>
+          <div className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+          <div>
+            Saídas: <span className="font-semibold text-rose-600 dark:text-rose-400">{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
       </header>

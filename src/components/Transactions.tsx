@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowUpRight, ArrowDownRight, Trash2, ArrowRightLeft, Clock, Pencil, Calendar, Search } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Trash2, ArrowRightLeft, Clock, Pencil, Calendar, Search, BookOpen } from 'lucide-react';
 import { MonthlyData, Transaction, Account } from '../types';
 import { formatCurrency, BUCKETS } from '../lib/utils';
 
@@ -11,11 +11,19 @@ interface TransactionsProps {
   onDelete: (id: string) => void;
   onTogglePending: (id: string) => void;
   accounts?: Account[];
+  onSaveNote?: (note: string) => void;
 }
 
-export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts }: TransactionsProps) {
+export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts, onSaveNote }: TransactionsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'transfer' | 'pending'>('all');
+  const [note, setNote] = useState(data.devotionalNote || '');
+  const [isEditingNote, setIsEditingNote] = useState(false);
+
+  useEffect(() => {
+    setNote(data.devotionalNote || '');
+    setIsEditingNote(false);
+  }, [data.devotionalNote]);
 
   const getAccountLabel = (accountId?: string) => {
     const found = accounts?.find(a => a.id === accountId);
@@ -75,6 +83,76 @@ export function Transactions({ data, onEdit, onDelete, onTogglePending, accounts
     <div className="pb-24">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Extrato</h2>
+      </div>
+
+      {/* Seção de Anotações do Mês */}
+      <div className="glass-card p-5 mb-6 border-amber-100/50 dark:border-amber-950/20 bg-amber-50/10 dark:bg-amber-950/5 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-500 dark:text-amber-400">
+              <BookOpen size={18} />
+            </span>
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">
+              Anotações & Reflexões do Mês
+            </h3>
+          </div>
+          {!isEditingNote && (
+            <button
+              onClick={() => setIsEditingNote(true)}
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors flex items-center gap-1"
+            >
+              <Pencil size={12} /> Editar
+            </button>
+          )}
+        </div>
+
+        {isEditingNote ? (
+          <div className="space-y-3">
+            <textarea
+              className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 dark:focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 outline-none h-24 transition-all resize-none"
+              placeholder="Escreva aqui os aprendizados, anotações ou observações deste mês..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setNote(data.devotionalNote || '');
+                  setIsEditingNote(false);
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (onSaveNote) {
+                    onSaveNote(note);
+                  }
+                  setIsEditingNote(false);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all flex items-center gap-1"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => setIsEditingNote(true)}
+            className="cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/10 p-2 rounded-xl transition-all"
+          >
+            {note ? (
+              <p className="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">
+                {note}
+              </p>
+            ) : (
+              <p className="text-slate-400 dark:text-slate-500 text-xs italic">
+                Nenhuma anotação registrada para este mês ainda. Clique para adicionar suas reflexões, conquistas ou compromissos.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mb-6 relative">

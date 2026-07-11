@@ -675,6 +675,7 @@ export default function App() {
               onTogglePending={(id) => toggleTransactionPending(monthId, id)}
               onEdit={handleEditTransaction}
               accounts={state.accounts}
+              onSaveNote={(note) => setDevotionalNote(monthId, note)}
             />
           )}
           {currentTab === 'planning' && (
