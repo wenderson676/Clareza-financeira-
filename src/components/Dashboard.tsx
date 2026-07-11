@@ -518,14 +518,14 @@ export function Dashboard({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const DEFAULT_CARD_ORDER = [
-    'raioX',
     'contas',
-    'analiseMensal',
     'contasAPagar',
-    'distribuicao',
     'envelopes',
-    'dividas',
+    'analiseMensal',
+    'raioX',
+    'distribuicao',
     'cofrinho',
+    'dividas',
     'evolucao',
     'reflexao',
     'sabedoria'
@@ -1334,34 +1334,30 @@ export function Dashboard({
 
   return (
     <div className="space-y-6 pb-24">
-      <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors text-center">
-        <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-          Saldo Atual
-        </h2>
-        <div className="flex justify-center items-center gap-3 mt-1 mb-6">
-          <span className={`text-5xl font-black tracking-tight ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
-            {formatCurrency(currentBalance)}
-          </span>
-        </div>
-        
-        <div className="grid grid-cols-3 gap-3 text-sm">
-          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Inicial</div>
-            <div className={`font-black text-xs sm:text-sm ${previousBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+      <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors">
+        <div className="grid grid-cols-3 items-center gap-2 sm:gap-4 mb-4">
+          {/* Saldo Inicial - Esquerda */}
+          <div className="text-center sm:text-left bg-slate-50/50 dark:bg-slate-800/10 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-800/40">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block mb-1">Inicial</span>
+            <span className={`font-bold text-xs sm:text-sm block truncate ${previousBalance >= 0 ? 'text-slate-600 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}>
               {formatCurrency(previousBalance)}
-            </div>
+            </span>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Saldo</div>
-            <div className={`font-black text-xs sm:text-sm ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
+
+          {/* Saldo Atual - Centro (Tamanho Maior) */}
+          <div className="text-center py-2 px-1">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold tracking-wider block mb-0.5">Saldo Atual</span>
+            <span className={`text-xl sm:text-4xl md:text-5xl font-black tracking-tight block truncate ${currentBalance >= 0 ? 'text-slate-800 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'}`}>
               {formatCurrency(currentBalance)}
-            </div>
+            </span>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-center">
-            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Previsão</div>
-            <div className={`font-black text-xs sm:text-sm ${projectedBalance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`}>
+
+          {/* Previsão - Direita */}
+          <div className="text-center sm:text-right bg-slate-50/50 dark:bg-slate-800/10 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-800/40">
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider block mb-1">Previsão</span>
+            <span className={`font-bold text-xs sm:text-sm block truncate ${projectedBalance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-600 dark:text-rose-400'}`}>
               {formatCurrency(projectedBalance)}
-            </div>
+            </span>
           </div>
         </div>
 

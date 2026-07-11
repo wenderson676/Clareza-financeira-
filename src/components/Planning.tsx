@@ -74,10 +74,6 @@ export function Planning({
     cashFlowPressure: {
       title: 'Pressão de Caixa (30 Dias)',
       desc: 'Mede o nível de aperto do seu dinheiro para as próximas semanas. Acima de 90% significa risco de déficit, ou seja, quase todo o dinheiro disponível já está comprometido.'
-    },
-    projection: {
-      title: 'Projeção de Fluxo de Caixa',
-      desc: 'A projeção é o espelho do seu amanhã com base na realidade de hoje. Ela calcula seu saldo futuro somando os ganhos recorrentes e subtraindo os pagamentos de parcelas, metas e contas anotadas de forma explícita. Sem dados inventados!'
     }
   };
 
@@ -389,88 +385,7 @@ export function Planning({
             </div>
           </div>
 
-          {/* Parsed / Recognized commitments from text notes */}
-          {diagnosis.parsedCommitments.length > 0 && (
-            <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <RefreshCw size={12} className="animate-spin-slow text-indigo-500" />
-                Compromissos e Padrões Mapeados nas Anotações
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {diagnosis.parsedCommitments.map((c, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex items-start gap-2 text-xs">
-                    <span className="mt-0.5">
-                      {c.type === 'receita' && '💰'}
-                      {c.type === 'despesa' && '💸'}
-                      {c.type === 'divida' && '⚠️'}
-                      {c.type === 'oportunidade' && '🎯'}
-                      {c.type === 'aviso' && 'ℹ️'}
-                    </span>
-                    <div className="space-y-0.5 w-full">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[9px] font-extrabold text-slate-400 block uppercase">{c.category}</span>
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                            c.status === 'realizado' ? 'bg-emerald-100 text-emerald-700' :
-                            c.status === 'atrasado' ? 'bg-rose-100 text-rose-700' :
-                            c.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
-                            c.status === 'planejado' ? 'bg-indigo-100 text-indigo-700' :
-                            'bg-slate-100 text-slate-500'
-                          }`}>
-                            {c.status}
-                          </span>
-                          {c.confidence && (
-                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                              c.confidence === 'confirmado' ? 'bg-emerald-100 text-emerald-700' :
-                              c.confidence === 'alta' ? 'bg-blue-100 text-blue-700' :
-                              c.confidence === 'media' ? 'bg-amber-100 text-amber-700' :
-                              'bg-slate-100 text-slate-500'
-                            }`}>
-                              {c.confidence} conf.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-slate-700 dark:text-slate-300 font-semibold">{c.text}</p>
-                      {c.amount && (
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1">
-                          Montante: {formatBRL(c.amount)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Recurrence Patterns */}
-          {diagnosis.recurrences.length > 0 && (
-            <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <RefreshCw size={12} className="text-emerald-500" />
-                Padrões e Recorrências Detectadas
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {diagnosis.recurrences.map((r, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-800/80 flex flex-col gap-1 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-extrabold text-slate-500 block uppercase">{r.category}</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 uppercase">
-                        {r.frequency}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                      Média: {formatBRL(r.averageAmount)}
-                    </p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
-                      {r.suggestedAction}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Structured Interactive Action Plan */}
           <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-5">
@@ -625,55 +540,7 @@ export function Planning({
             </div>
           </div>
 
-          {/* Professional Cashflow Projections */}
-          <div className="glass-card p-6 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-              <TrendingUp size={18} className="text-indigo-500" />
-              Projeção de Fluxo de Caixa (Próximos 3 Ciclos)
-              <button 
-                onClick={() => setSelectedMetricHelp(selectedMetricHelp === 'projection' ? null : 'projection')}
-                className="p-0.5 text-slate-400 hover:text-indigo-500 cursor-pointer transition-colors inline-flex ml-1 items-center"
-                title="Explicar projeção"
-              >
-                <HelpCircle size={14} />
-              </button>
-            </h3>
-            
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Cálculo estimado do seu saldo futuro baseado estritamente em suas metas, parcelas ativas e anotações financeiras cadastradas.
-            </p>
 
-            <div className="space-y-3 pt-2">
-              {diagnosis.projections.map((p, idx) => {
-                const isNoFutureData = idx > 0 && p.projectedIncome === 0 && p.projectedExpense === 0;
-                return (
-                  <div key={idx} className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row justify-between sm:items-center gap-3 text-xs">
-                    <div>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">{p.period}</span>
-                      {isNoFutureData ? (
-                        <div className="mt-1 text-[10px] text-amber-500 dark:text-amber-400/80 font-medium italic">
-                          Sem lançamentos futuros ou dívidas ativas planejadas para este mês.
-                        </div>
-                      ) : (
-                        <div className="flex gap-4 mt-1 text-[10px] text-slate-500">
-                          <span>Receita: <span className="font-bold text-slate-700 dark:text-slate-300">{formatBRL(p.projectedIncome)}</span></span>
-                          <span>Despesa: <span className="font-bold text-slate-700 dark:text-slate-300">{formatBRL(p.projectedExpense)}</span></span>
-                        </div>
-                      )}
-                    </div>
-                    {!isNoFutureData && (
-                      <div className="sm:text-right">
-                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Saldo Acumulado Projetado</span>
-                        <span className={`text-sm font-black ${p.projectedBalance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {formatBRL(p.projectedBalance)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
           {/* Educational Insight Corner */}
           {diagnosis.insights.length > 0 && (
