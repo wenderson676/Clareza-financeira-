@@ -166,7 +166,16 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
   const handleSaveTransaction = (shouldClose: boolean) => {
     setError('');
     const parsedAmount = parseFloat(amount.replace(/\./g, '').replace(',', '.'));
-    if (!parsedAmount || isNaN(parsedAmount) || !description || (formTab !== 'transfer' && !category)) return;
+    
+    if (!parsedAmount || isNaN(parsedAmount)) {
+      setError('Por favor, insira um valor válido.');
+      return;
+    }
+
+    if (formTab !== 'transfer' && !category) {
+      setError('Por favor, selecione uma categoria.');
+      return;
+    }
 
     if (formTab === 'transfer' && accountBalances) {
       if (transferFrom === transferTo) {
@@ -204,6 +213,8 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     let finalAccount = account;
     let finalToAccount: AccountType | undefined;
 
+    const finalDescription = description.trim() || finalCategory || 'Sem descrição';
+
     if (formTab === 'income') {
       finalType = 'income';
       finalBucket = 'Renda';
@@ -235,7 +246,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     onSave({
       type: finalType,
       amount: parsedAmount,
-      description,
+      description: finalDescription,
       date,
       bucket: finalBucket,
       category: finalCategory,
@@ -409,7 +420,6 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Descrição</label>
                 <input
                   type="text"
-                  required
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   className="w-full bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-2 px-3 outline-none focus:border-slate-400 text-xs font-medium"

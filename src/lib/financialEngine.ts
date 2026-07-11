@@ -12,6 +12,30 @@ export interface FinancialMetrics {
   totalDebts: number;
   monthlySurplus: number;
   cashFlowPressure30D: number; // Percentage representing short-term cash pressure
+  healthScore: number;       // 0 to 100 Financial Health Score
+  healthScoreDetails: {      // Breakdown of the score
+    liquidityScore: number;
+    debtScore: number;
+    savingsScore: number;
+    incomeRegularityScore: number;
+    emergencyReserveScore: number;
+    goalsScore: number;
+  };
+  confidenceLevel: number;   // 0 to 100 representing confidence in the diagnosis
+  confidenceRating: 'Baixa (40%)' | 'Média (70%)' | 'Alta (95%)';
+  explanation: string;       // Explanation of the mode decision
+  cashFlowForecast: {
+    balance7D: number;
+    balance30D: number;
+    daysUntilZero: number | null; // Null if positive cash flow / won't run out
+  };
+  behaviorPatterns: string[]; // Detected habits
+  trends: {
+    status: 'Melhorando' | 'Piorando' | 'Estável';
+    statusExplanation: string;
+    topGrowingExpenseCategory: string | null;
+    incomeStability: string;
+  };
 }
 
 export interface ParsedCommitment {
@@ -43,7 +67,7 @@ export interface RecurrencePattern {
 export interface FinancialDiagnosis {
   mode: FinancialMode;
   riskLevel: RiskLevel;
-  mainProblem: string;
+  mainProblem: { title: string; desc: string };
   strongPoints: string[];
   attentionPoints: string[];
   biggestDrain: string | null;
@@ -345,11 +369,11 @@ export function generateFinancialDiagnosis(
   const adjustedExpenses = totalExpenses + additionalUnregisteredExpenses;
   const monthlySurplus = adjustedIncome - adjustedExpenses;
 
-  // 6. Professional Financial Metrics
-  const dtiRatio = adjustedIncome > 0 ? (totalDebtMonthly / adjustedIncome) * 100 : (totalDebtMonthly > 0 ? 100 : 0);
+  // 6. Professional Financial Metrics (with division-by-zero guards)
+  const dtiRatio = adjustedIncome > 0 ? (totalDebtMonthly / adjustedIncome) * 100 : (totalDebtMonthly > 0 ? 999 : 0);
   const savingsRate = adjustedIncome > 0 ? (Math.max(0, monthlySurplus) / adjustedIncome) * 100 : 0;
-  const fixedOverheadIndex = adjustedIncome > 0 ? ((totalNecessities + totalDebtMonthly) / adjustedIncome) * 100 : (totalNecessities > 0 ? 100 : 0);
-  const runwayMonths = adjustedExpenses > 0 ? (totalAssets / adjustedExpenses) : (totalAssets > 0 ? 99 : 0);
+  const fixedOverheadIndex = adjustedIncome > 0 ? ((totalNecessities + totalDebtMonthly) / adjustedIncome) * 100 : (totalNecessities > 0 ? 999 : 0);
+  const runwayMonths = Math.min(99, adjustedExpenses > 0 ? (totalAssets / adjustedExpenses) : (totalAssets > 0 ? 99 : 0));
 
   // 6.1 Detect Recurrences
   const recurrences: RecurrencePattern[] = [];
@@ -401,41 +425,121 @@ export function generateFinancialDiagnosis(
   const availableCash30D = Math.max(0, currentBalance) + projectedIncome30D;
   const cashFlowPressure30D = availableCash30D > 0 ? (projectedExpense30D / availableCash30D) * 100 : (projectedExpense30D > 0 ? 150 : 0);
 
-  // 7. Determine Financial Mode & Risk
+  // 6.2 Compute 3-Month Moving Average (Hysteresis/Smoothing) for stable mode transitions
+  let smoothedRunway = runwayMonths;
+  let smoothedSavingsRate = savingsRate;
+  let smoothedFixedOverhead = fixedOverheadIndex;
+
+  const historicalMonths = Object.keys(allData).sort();
+  const currentIdx = historicalMonths.indexOf(currentMonthData.monthId);
+
+  if (currentIdx > 0) {
+    let runwaySum = runwayMonths;
+    let savingsRateSum = savingsRate;
+    let fixedOverheadSum = fixedOverheadIndex;
+    let monthCount = 1;
+
+    for (let k = 1; k <= 2; k++) {
+      if (currentIdx - k >= 0) {
+        const prevMonthId = historicalMonths[currentIdx - k];
+        const prevMonth = allData[prevMonthId];
+        if (prevMonth) {
+          const prevTxs = prevMonth.transactions || [];
+          const prevRealizedInc = prevTxs.filter(t => t.type === 'income' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+          const prevPendingInc = prevTxs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+          const prevTotalInc = prevRealizedInc + prevPendingInc;
+
+          const prevRealizedExp = prevTxs.filter(t => t.type === 'expense' && !t.isPending).reduce((sum, t) => sum + t.amount, 0);
+          const prevPendingExp = prevTxs.filter(t => t.type === 'expense' && t.isPending).reduce((sum, t) => sum + t.amount, 0);
+          const prevTotalExp = prevRealizedExp + prevPendingExp;
+
+          const prevNecessities = prevTxs.filter(t => t.type === 'expense' && t.bucket === 'Necessidades').reduce((sum, t) => sum + t.amount, 0);
+
+          const prevSurplus = prevTotalInc - prevTotalExp;
+          
+          const prevSavingsRate = prevTotalInc > 0 ? (Math.max(0, prevSurplus) / prevTotalInc) * 100 : 0;
+          const prevFixedOverhead = prevTotalInc > 0 ? ((prevNecessities + totalDebtMonthly) / prevTotalInc) * 100 : (prevNecessities > 0 ? 999 : 0);
+          
+          let prevAssets = totalAssets;
+          if (prevSurplus !== 0) {
+            prevAssets = Math.max(0, totalAssets - monthlySurplus);
+          }
+          const prevRunway = Math.min(99, prevTotalExp > 0 ? (prevAssets / prevTotalExp) : (prevAssets > 0 ? 99 : 0));
+
+          runwaySum += prevRunway;
+          savingsRateSum += prevSavingsRate;
+          fixedOverheadSum += prevFixedOverhead;
+          monthCount++;
+        }
+      }
+    }
+
+    smoothedRunway = runwaySum / monthCount;
+    smoothedSavingsRate = savingsRateSum / monthCount;
+    smoothedFixedOverhead = fixedOverheadSum / monthCount;
+  }
+
+  // 7. Determine Financial Mode & Risk using smoothed indicators to avoid jitter/flickering
   let mode: FinancialMode = 'Estabilização';
   let riskLevel: RiskLevel = 'Moderado';
-  let mainProblem = '';
+  let mainProblem = { title: '', desc: '' };
 
-  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < -100) || (runwayMonths < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35) || cashFlowPressure30D > 120;
+  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < -100) || (smoothedRunway < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35) || cashFlowPressure30D > 120;
 
   if (adjustedIncome === 0 && adjustedExpenses > 0) {
     mode = 'Crise';
     riskLevel = 'Crítico';
-    mainProblem = 'Você ainda não registrou dinheiro entrando este mês para cobrir as saídas. Verifique suas receitas.';
+    mainProblem = {
+      title: 'Ausência de Renda',
+      desc: 'Você ainda não registrou dinheiro entrando este mês para cobrir as saídas. Verifique suas receitas.'
+    };
   } else if (hasHighSurvivalRisk) {
     mode = 'Crise';
     riskLevel = 'Crítico';
-    mainProblem = hasLateDebts 
-      ? 'Contas em atraso estão sufocando seu fluxo de caixa de curto prazo.' 
-      : 'Sua pressão de caixa para os próximos 30 dias está muito alta. Risco de déficit iminente.';
-  } else if (fixedOverheadIndex > 75 || runwayMonths < 1 || cashFlowPressure30D > 90) {
+    mainProblem = {
+      title: 'Crise de Curto Prazo',
+      desc: hasLateDebts 
+        ? 'Contas em atraso estão sufocando seu fluxo de caixa de curto prazo.' 
+        : 'Sua pressão de caixa para os próximos 30 dias está muito alta. Risco de déficit iminente.'
+    };
+  } else if (smoothedFixedOverhead > 75 || smoothedRunway < 1 || cashFlowPressure30D > 90) {
     mode = 'Sobrevivência';
     riskLevel = 'Alto';
-    mainProblem = 'As obrigações engolem quase toda sua disponibilidade. A pressão de caixa exige atenção rápida.';
-  } else if (runwayMonths < 3 || cashFlowPressure30D > 60) {
+    mainProblem = {
+      title: 'Sobrevivência Pressionada',
+      desc: 'As obrigações essenciais engolem quase toda sua disponibilidade de recursos. A pressão de caixa exige atenção rápida.'
+    };
+  } else if (smoothedRunway < 3 || cashFlowPressure30D > 60) {
     mode = 'Estabilização';
     riskLevel = 'Moderado';
-    mainProblem = 'Contas em dia, mas reserva de segurança ainda é frágil para suportar imprevistos severos.';
-  } else if (totalDebtAmount === 0 && savingsRate > 20 && runwayMonths >= 3) {
-    if (runwayMonths >= 6 && savingsRate > 35) {
+    mainProblem = {
+      title: 'Estabilização em Progresso',
+      desc: 'Suas contas básicas estão em dia, mas sua reserva de segurança ainda é frágil para suportar imprevistos severos.'
+    };
+  } else if (totalDebtAmount === 0 && smoothedSavingsRate > 15 && smoothedRunway >= 3) {
+    if (smoothedRunway >= 6 && smoothedSavingsRate > 35) {
       mode = 'Expansão';
       riskLevel = 'Mínimo';
-      mainProblem = 'Saúde financeira excelente. Fluxo de caixa muito confortável para acelerar multiplicação patrimonial.';
+      mainProblem = {
+        title: 'Fase de Expansão',
+        desc: 'Sua saúde financeira é excelente. Seu fluxo de caixa está muito confortável para acelerar a multiplicação de patrimônio.'
+      };
     } else {
       mode = 'Construção';
       riskLevel = 'Baixo';
-      mainProblem = 'Sobra consistente e risco baixo. Momento ideal para escalar metas de poupança e investimentos.';
+      mainProblem = {
+        title: 'Fase de Construção',
+        desc: 'Você possui sobras consistentes e risco muito baixo. Momento ideal para escalar suas metas de poupança e investimentos.'
+      };
     }
+  } else {
+    // Fallback default if debts exist or savings rate is lower but runway is >= 3
+    mode = 'Estabilização';
+    riskLevel = 'Moderado';
+    mainProblem = {
+      title: 'Consolidação de Reserva',
+      desc: 'Você possui um bom fôlego financeiro (Runway), mas ainda precisa quitar dívidas ou elevar sua taxa de poupança para entrar na Construção.'
+    };
   }
 
   // Find biggest drain globally
@@ -684,6 +788,185 @@ export function generateFinancialDiagnosis(
     recommendedBudgetMode = '50-20-30';
   }
 
+  // --- ADDITIONAL DIAGNOSIS ENHANCEMENTS ---
+
+  // 1. Explanation of decisions
+  let explanation = '';
+  if (adjustedIncome === 0 && adjustedExpenses > 0) {
+    explanation = 'O Modo Crise foi ativado porque suas despesas estão registradas mas nenhuma renda foi lançada para este período.';
+  } else if (hasHighSurvivalRisk) {
+    explanation = `O Modo Crise foi ativado porque: ${hasLateDebts ? 'há contas/dívidas em atraso registradas' : ''} ${currentBalance < -100 ? 'seu saldo em conta está negativo' : ''} ${runwayMonths < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35 ? 'sua reserva é baixíssima para cobrir o peso atual das parcelas' : ''} ${cashFlowPressure30D > 120 ? 'a pressão de fluxo de caixa para 30 dias ultrapassa o limite seguro de 120%' : ''}.`;
+  } else if (fixedOverheadIndex > 75 || runwayMonths < 1 || cashFlowPressure30D > 90) {
+    explanation = `O Modo Sobrevivência foi ativado porque suas despesas fixas de sobrevivência consomem mais de 75% da sua renda (${fixedOverheadIndex.toFixed(0)}%), sua reserva de segurança cobre menos de 1 mês (${runwayMonths.toFixed(1)} meses) ou a pressão de caixa nos próximos 30 dias está excessivamente alta (${cashFlowPressure30D.toFixed(0)}%).`;
+  } else if (runwayMonths < 3 || cashFlowPressure30D > 60) {
+    explanation = `O Modo Estabilização foi ativado porque você possui contas em dia e saldo estável, mas sua reserva cobre menos que 3 meses de custos de vida (${runwayMonths.toFixed(1)} meses), ou sua pressão de caixa de 30 dias requer monitoramento (${cashFlowPressure30D.toFixed(0)}%).`;
+  } else if (totalDebtAmount === 0 && savingsRate > 20 && runwayMonths >= 3) {
+    if (runwayMonths >= 6 && savingsRate > 35) {
+      explanation = `O Modo Expansão foi ativado porque sua saúde financeira é espetacular: você tem zero dívidas, taxa de poupança acima de 35% (${savingsRate.toFixed(0)}%) e reserva confortável de mais de 6 meses de custos (${runwayMonths.toFixed(1)} meses).`;
+    } else {
+      explanation = `O Modo Construção foi ativado porque você não possui dívidas ativas, sua taxa de poupança mensal supera 20% (${savingsRate.toFixed(0)}%) e sua reserva cobre mais de 3 meses (${runwayMonths.toFixed(1)} meses).`;
+    }
+  } else {
+    explanation = `O Modo Estabilização foi ativado por padrão para consolidar seus hábitos, manter suas sobras positivas (${savingsRate.toFixed(0)}% poupado) e fortalecer sua reserva inicial.`;
+  }
+
+  // 2. Financial Health Score (0 to 100)
+  const liquidityScore = Math.min(20, Math.max(0, adjustedExpenses > 0 ? (Math.max(0, currentBalance) / (adjustedExpenses * 1.5)) * 20 : (currentBalance > 0 ? 20 : 0)));
+  const baseDebtScore = totalDebtAmount === 0 ? 20 : Math.max(0, 20 * (1 - dtiRatio / 50));
+  const debtScore = Math.max(0, hasLateDebts ? baseDebtScore - 5 : baseDebtScore);
+  const savingsScore = Math.min(20, Math.max(0, (savingsRate / 30) * 20));
+  const incomeRegularityScore = adjustedIncome === 0 ? 0 : (historicalMonths.length >= 3 ? 10 : (historicalMonths.length === 2 ? 8 : 5));
+  const emergencyReserveScore = runwayMonths >= 6 ? 20 : (runwayMonths >= 3 ? 15 : Math.min(15, Math.max(0, (runwayMonths / 3) * 15)));
+  let goalsScore = 7;
+  if (goals.length > 0) {
+    const totalGoalProgress = goals.reduce((sum, g) => sum + (g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0), 0);
+    goalsScore = Math.min(10, (totalGoalProgress / goals.length) * 10);
+  }
+  const healthScore = Math.round(liquidityScore + debtScore + savingsScore + incomeRegularityScore + emergencyReserveScore + goalsScore);
+
+  // 3. Confidence level
+  let confidenceLevel = 40;
+  if (txs.length >= 10 && historicalMonths.length >= 3) {
+    confidenceLevel = 95;
+  } else if (txs.length >= 5 || historicalMonths.length >= 2) {
+    confidenceLevel = 70;
+  }
+  const confidenceRating: 'Baixa (40%)' | 'Média (70%)' | 'Alta (95%)' = 
+    confidenceLevel === 95 ? 'Alta (95%)' : (confidenceLevel === 70 ? 'Média (70%)' : 'Baixa (40%)');
+
+  // 4. Cash Flow Forecast
+  const dailyOutflow = adjustedExpenses / 30;
+  let incoming7D = txs.filter(t => t.type === 'income' && t.isPending).reduce((sum, t) => sum + t.amount, 0) * 0.25;
+  let outgoing7D = txs.filter(t => t.type === 'expense' && t.isPending).reduce((sum, t) => sum + t.amount, 0) * 0.25;
+  parsedCommitments.forEach(c => {
+    if (c.dateStr && c.amount) {
+      const dayMatch = c.dateStr.match(/(\d+)/);
+      if (dayMatch) {
+        const day = parseInt(dayMatch[1]);
+        if (day <= 7) {
+          if (c.type === 'receita') incoming7D += c.amount;
+          else if (c.type === 'despesa' || c.type === 'divida') outgoing7D += c.amount;
+        }
+      }
+    }
+  });
+  const balance7D = currentBalance - (dailyOutflow * 7) + incoming7D - outgoing7D;
+  const balance30D = currentBalance + adjustedIncome - adjustedExpenses;
+  let daysUntilZero: number | null = null;
+  if (monthlySurplus < 0) {
+    if (currentBalance > 0) {
+      daysUntilZero = Math.ceil(currentBalance / Math.abs(monthlySurplus / 30));
+    } else {
+      daysUntilZero = 0;
+    }
+  }
+
+  // 5. Behavior Patterns
+  const behaviorPatterns: string[] = [];
+  let weekendExpenses = 0;
+  let totalDiscretionary = 0;
+  txs.filter(t => t.type === 'expense').forEach(t => {
+    if (t.bucket === 'Desejos') {
+      totalDiscretionary += t.amount;
+      if (t.date) {
+        const d = new Date(t.date);
+        const day = d.getDay();
+        if (day === 0 || day === 6 || day === 5) {
+          weekendExpenses += t.amount;
+        }
+      }
+    }
+  });
+  if (totalDiscretionary > 0 && (weekendExpenses / totalDiscretionary) > 0.5) {
+    behaviorPatterns.push("Concentração de Gastos no Fim de Semana: Suas despesas com desejos e lazer concentram-se fortemente nas sextas, sábados e domingos.");
+  }
+  let hasPostSalIntenseSpending = false;
+  const incomes = txs.filter(t => t.type === 'income');
+  const expenses = txs.filter(t => t.type === 'expense' && t.bucket === 'Desejos' && t.amount > 100);
+  incomes.forEach(inc => {
+    if (inc.date) {
+      const incDate = new Date(inc.date).getTime();
+      expenses.forEach(exp => {
+        if (exp.date) {
+          const expDate = new Date(exp.date).getTime();
+          const diffDays = (expDate - incDate) / (1000 * 60 * 60 * 24);
+          if (diffDays >= 0 && diffDays <= 4) {
+            hasPostSalIntenseSpending = true;
+          }
+        }
+      });
+    }
+  });
+  if (hasPostSalIntenseSpending) {
+    behaviorPatterns.push("Gastos Imediatos Pós-Salário: Notou-se um impulso de compras supérfluas de maior valor nos primeiros dias após receber receitas.");
+  }
+  if (hasLateDebts || parsedCommitments.some(c => c.status === 'atrasado')) {
+    behaviorPatterns.push("Alerta de Atrasos: Há contas ou parcelas de dívidas registradas com atraso neste ciclo, gerando juros evitáveis.");
+  }
+  if (monthlySurplus < 0) {
+    behaviorPatterns.push("Fluxo Mensal em Déficit: Suas despesas estão superando suas receitas ativas neste mês.");
+  } else if (savingsRate > 20) {
+    behaviorPatterns.push("Hábito Saudável de Poupança: Você está conseguindo poupar uma fração excelente de mais de 20% da sua renda atual.");
+  }
+  if (behaviorPatterns.length === 0) {
+    behaviorPatterns.push("Comportamento Estável: Padrão de gastos regular e equilibrado identificado até o momento.");
+  }
+
+  // 6. Trend Analysis
+  let trendStatus: 'Melhorando' | 'Piorando' | 'Estável' = 'Estável';
+  let trendExplanation = 'Dados históricos insuficientes para traçar tendências de longo prazo.';
+  let topGrowingExpenseCategory: string | null = null;
+  let incomeStability = 'Previsão estável';
+  if (currentIdx > 0) {
+    const prevMonthId = historicalMonths[currentIdx - 1];
+    const prevMonth = allData[prevMonthId];
+    if (prevMonth) {
+      const prevTxs = prevMonth.transactions || [];
+      const prevIncome = prevTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+      const prevExpense = prevTxs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+      const prevSurplus = prevIncome - prevExpense;
+      const currentSurplus = totalIncome - totalExpenses;
+      if (currentSurplus > prevSurplus + 100) {
+        trendStatus = 'Melhorando';
+        trendExplanation = `Seu resultado líquido melhorou em relação ao mês anterior (${formatBRL(currentSurplus)} vs ${formatBRL(prevSurplus)}).`;
+      } else if (currentSurplus < prevSurplus - 100) {
+        trendStatus = 'Piorando';
+        trendExplanation = `Suas sobras diminuíram comparado ao mês anterior (${formatBRL(currentSurplus)} vs ${formatBRL(prevSurplus)}). Fique atento.`;
+      } else {
+        trendStatus = 'Estável';
+        trendExplanation = 'Sua sobra financeira mantém-se estável e controlada em relação ao mês passado.';
+      }
+      const currentCatTotals: Record<string, number> = {};
+      txs.filter(t => t.type === 'expense').forEach(t => {
+        currentCatTotals[t.category] = (currentCatTotals[t.category] || 0) + t.amount;
+      });
+      const prevCatTotals: Record<string, number> = {};
+      prevTxs.filter(t => t.type === 'expense').forEach(t => {
+        prevCatTotals[t.category] = (prevCatTotals[t.category] || 0) + t.amount;
+      });
+      let maxGrowth = 0;
+      Object.keys(currentCatTotals).forEach(cat => {
+        const curAmt = currentCatTotals[cat];
+        const prevAmt = prevCatTotals[cat] || 0;
+        const growth = curAmt - prevAmt;
+        if (growth > maxGrowth && growth > 50) {
+          maxGrowth = growth;
+          topGrowingExpenseCategory = cat;
+        }
+      });
+      if (prevIncome > 0) {
+        const diffPercent = Math.abs(totalIncome - prevIncome) / prevIncome;
+        if (diffPercent < 0.1) {
+          incomeStability = 'Alta Regularidade (Renda previsível)';
+        } else if (totalIncome > prevIncome) {
+          incomeStability = 'Crescimento (Renda superior ao mês passado)';
+        } else {
+          incomeStability = 'Flutuante (Renda menor que o mês passado)';
+        }
+      }
+    }
+  }
+
   return {
     mode,
     riskLevel,
@@ -701,7 +984,31 @@ export function generateFinancialDiagnosis(
       totalAssets,
       totalDebts: totalDebtAmount,
       monthlySurplus,
-      cashFlowPressure30D
+      cashFlowPressure30D,
+      healthScore,
+      healthScoreDetails: {
+        liquidityScore,
+        debtScore,
+        savingsScore,
+        incomeRegularityScore,
+        emergencyReserveScore,
+        goalsScore
+      },
+      confidenceLevel,
+      confidenceRating,
+      explanation,
+      cashFlowForecast: {
+        balance7D,
+        balance30D,
+        daysUntilZero
+      },
+      behaviorPatterns,
+      trends: {
+        status: trendStatus,
+        statusExplanation: trendExplanation,
+        topGrowingExpenseCategory,
+        incomeStability
+      }
     },
     parsedCommitments: globalCommitments,
     projections,

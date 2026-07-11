@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckCircle2, Lightbulb, SlidersHorizontal, ArrowUp, ArrowDown, RotateCcw, GripVertical, Wallet, PiggyBank, CreditCard, Coins, Bell, BellRing, Check } from 'lucide-react';
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
-import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account } from '../types';
+import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account, Transaction, Bucket } from '../types';
 import { DebtsSection } from './DebtsSection';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { checkAndTriggerNotifications, requestNotificationPermission, getNotificationPermissionStatus, TransactionAlert } from '../lib/notifications';
+import { generateFinancialDiagnosis } from '../lib/financialEngine';
+import { TrendingUp, TrendingDown, Activity, Gauge, Sparkles, Eye } from 'lucide-react';
 
 interface DashboardProps {
   data: MonthlyData;
@@ -31,6 +33,7 @@ interface DashboardProps {
   updateAccount?: (id: string, updated: Partial<Account>) => void;
   deleteAccount?: (id: string) => void;
   onTogglePending?: (monthId: string, id: string) => void;
+  addTransaction?: (monthId: string, transaction: Omit<Transaction, 'id'>) => void;
 }
 
 export function Dashboard({ 
@@ -54,7 +57,8 @@ export function Dashboard({
   addAccount,
   updateAccount,
   deleteAccount,
-  onTogglePending
+  onTogglePending,
+  addTransaction
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
@@ -63,6 +67,75 @@ export function Dashboard({
   
   const [note, setNote] = useState(data.devotionalNote || '');
   const [isEditingNote, setIsEditingNote] = useState(false);
+
+  // --- CO-PILOT SIMULATOR AND TAB STATES ---
+  const [simIncomeIncrease, setSimIncomeIncrease] = useState(0);
+  const [simExpenseDecrease, setSimExpenseDecrease] = useState(0);
+  const [simDebtReduction, setSimDebtReduction] = useState(0);
+  const [raioXTab, setRaioXTab] = useState<'resumo' | 'saude' | 'tendencias' | 'previsoes' | 'simulador'>('resumo');
+
+  const fullDiagnosis = useMemo(() => {
+    return generateFinancialDiagnosis(
+      data,
+      allData as any,
+      previousBalance,
+      debts,
+      goals,
+      accounts
+    );
+  }, [data, allData, previousBalance, debts, goals, accounts]);
+
+  const simulatedDiagnosis = useMemo(() => {
+    if (simIncomeIncrease === 0 && simExpenseDecrease === 0 && simDebtReduction === 0) {
+      return fullDiagnosis;
+    }
+    
+    const simulatedData = {
+      ...data,
+      transactions: [
+        ...(data.transactions || []),
+        ...(simIncomeIncrease > 0 ? [{
+          id: 'sim_income',
+          type: 'income' as const,
+          amount: simIncomeIncrease,
+          description: 'Renda Simulada Extra',
+          date: new Date().toISOString().split('T')[0],
+          bucket: 'Renda' as const,
+          category: 'Entradas',
+          isPending: false
+        }] : []),
+        ...(simExpenseDecrease > 0 ? [{
+          id: 'sim_expense_reduction',
+          type: 'income' as const,
+          amount: simExpenseDecrease,
+          description: 'Economia Simulada',
+          date: new Date().toISOString().split('T')[0],
+          bucket: 'Renda' as const,
+          category: 'Economias',
+          isPending: false
+        }] : [])
+      ]
+    };
+
+    const simulatedDebts = debts.map(d => {
+      if (simDebtReduction <= 0) return d;
+      const reduction = Math.min(d.totalAmount, simDebtReduction);
+      return {
+        ...d,
+        totalAmount: d.totalAmount - reduction,
+        monthlyPayment: d.totalAmount - reduction <= 0 ? 0 : d.monthlyPayment * ((d.totalAmount - reduction) / d.totalAmount)
+      };
+    });
+
+    return generateFinancialDiagnosis(
+      simulatedData,
+      allData as any,
+      previousBalance,
+      simulatedDebts,
+      goals,
+      accounts
+    );
+  }, [data, allData, previousBalance, debts, goals, accounts, simIncomeIncrease, simExpenseDecrease, simDebtReduction, fullDiagnosis]);
 
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>(() => {
     return typeof window !== 'undefined' ? getNotificationPermissionStatus() : 'default';
@@ -596,111 +669,551 @@ export function Dashboard({
     setDraggedIndex(null);
   };
 
-  const renderRaioX = () => (
-    <motion.div 
-      key="raioX"
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="glass-card p-6 border-emerald-500/10 dark:border-emerald-500/20 bg-gradient-to-b from-white to-emerald-50/5 dark:from-slate-900 dark:to-emerald-950/5 relative overflow-hidden animate-fade-in"
-    >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full filter blur-2xl pointer-events-none" />
-      
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
-          🔍
-        </div>
-        <div>
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Raio-X Financeiro</h2>
-          <p className="text-xs text-slate-400 dark:text-slate-500">Diagnóstico automático do seu comportamento de gastos</p>
-        </div>
-      </div>
+  const renderRaioX = () => {
+    const diag = simulatedDiagnosis;
+    const isSimulated = simIncomeIncrease > 0 || simExpenseDecrease > 0 || simDebtReduction > 0;
+    
+    const scoreColor = 
+      diag.metrics.healthScore >= 80 ? 'text-emerald-500' :
+      diag.metrics.healthScore >= 60 ? 'text-sky-500' :
+      diag.metrics.healthScore >= 40 ? 'text-amber-500' :
+      'text-rose-500';
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    const scoreBg = 
+      diag.metrics.healthScore >= 80 ? 'bg-emerald-500/10' :
+      diag.metrics.healthScore >= 60 ? 'bg-sky-500/10' :
+      diag.metrics.healthScore >= 40 ? 'bg-amber-500/10' :
+      'bg-rose-500/10';
+
+    const getModeColor = (modeName: string) => {
+      switch (modeName) {
+        case 'Crise': return 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/30';
+        case 'Sobrevivência': return 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30';
+        case 'Estabilização': return 'text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-950/20 border-sky-100 dark:border-sky-900/30';
+        case 'Construção': return 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30';
+        case 'Expansão': return 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/30';
+        default: return 'text-slate-600 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800';
+      }
+    };
+
+    return (
+      <motion.div 
+        key="raioX"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="glass-card p-6 border-indigo-500/10 dark:border-indigo-500/20 bg-gradient-to-b from-white to-indigo-50/5 dark:from-slate-900 dark:to-indigo-950/5 relative overflow-hidden animate-fade-in shadow-md"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full filter blur-2xl pointer-events-none" />
         
-        {/* 1. Seu modo atual */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">1. Seu Modo Atual</span>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-2xl">{raioX.status.icon}</span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${raioX.status.color}`}>
-                {raioX.status.name}
-              </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-100 dark:border-slate-800/60 pb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">
+              🔍
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              {raioX.status.desc}
-            </p>
-          </div>
-          <div className="text-[10px] text-slate-400 mt-3 border-t border-slate-100 dark:border-slate-800/80 pt-2">
-            Modo Operacional: <span className="font-semibold">{budgetMode === '50-30-20' ? '50/30/20 (Padrão)' : budgetMode === '80-10-10' ? '80/10/10 (Sobrevivência)' : '90/5/5 (Crise)'}</span>
-          </div>
-        </div>
-
-        {/* 2. Maior problema hoje */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">2. Maior Problema Hoje</span>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-lg">
-                {raioX.problem.type === 'danger' ? '🚨' : raioX.problem.type === 'warning' ? '⚠️' : raioX.problem.type === 'success' ? '✨' : 'ℹ️'}
-              </span>
-              <span className={`text-xs font-bold ${
-                raioX.problem.type === 'danger' ? 'text-rose-600 dark:text-rose-400' :
-                raioX.problem.type === 'warning' ? 'text-amber-600 dark:text-amber-400' :
-                raioX.problem.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-                'text-slate-600 dark:text-slate-400'
-              }`}>
-                {raioX.problem.title}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              {raioX.problem.desc}
-            </p>
-          </div>
-        </div>
-
-        {/* 3. O que fazer agora */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">3. O que Fazer Agora</span>
-            <div className="flex items-start gap-2">
-              <Lightbulb size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                {raioX.action}
-              </p>
+            <div>
+              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight flex items-center gap-2">
+                Copiloto Financeiro Inteligente
+                {isSimulated && (
+                  <span className="text-[9px] font-black uppercase tracking-wider bg-purple-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                    Modo Simulação
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">Diagnósticos, tendências, padrões e simulador de decisões financeiras</p>
             </div>
           </div>
-        </div>
 
-        {/* 4. Previsão do mês */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between md:col-span-2 lg:col-span-1">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">4. Previsão do Mês</span>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              {raioX.forecast}
-            </p>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">Confiança:</span>
+            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+              diag.metrics.confidenceRating?.includes('Alta') ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+              diag.metrics.confidenceRating?.includes('Média') ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+              'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+            }`}>
+              {diag.metrics.confidenceRating}
+            </span>
           </div>
         </div>
 
-        {/* 5. Missão da semana */}
-        <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/10 dark:border-emerald-500/20 flex flex-col justify-between md:col-span-2 lg:col-span-2">
-          <div>
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-2">5. Missão da Semana</span>
-            <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 text-xs font-bold">
-                ✓
+        <div className="flex overflow-x-auto gap-1 border-b border-slate-100 dark:border-slate-800/80 mb-5 pb-2 -mx-2 px-2 no-scrollbar scroll-smooth">
+          {[
+            { id: 'resumo', label: 'Resumo Diário', icon: <Activity size={13} /> },
+            { id: 'saude', label: 'Índice de Saúde', icon: <Gauge size={13} /> },
+            { id: 'tendencias', label: 'Tendências & Padrões', icon: <TrendingUp size={13} /> },
+            { id: 'previsoes', label: 'Fluxo de Caixa', icon: <Coins size={13} /> },
+            { id: 'simulador', label: 'Simulador Financeiro', icon: <Sparkles size={13} /> }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setRaioXTab(tab.id as any)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                raioXTab === tab.id
+                  ? 'bg-indigo-600 text-white dark:bg-indigo-500 shadow-sm shadow-indigo-500/20'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/30 dark:hover:bg-slate-800/70 dark:text-slate-400'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={raioXTab}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2 }}
+            className="min-h-[220px]"
+          >
+            {raioXTab === 'resumo' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">1. Modo de Saúde Atual</span>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">
+                        {diag.mode === 'Crise' ? '🚨' : diag.mode === 'Sobrevivência' ? '⚠️' : diag.mode === 'Estabilização' ? '⚖️' : diag.mode === 'Construção' ? '🛡️' : '🚀'}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${getModeColor(diag.mode)}`}>
+                        {diag.mode}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                      {diag.metrics.explanation}
+                    </p>
+                  </div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/60 pt-2 flex justify-between items-center">
+                    <span>Divisão de Orçamento Recomendada:</span>
+                    <span className="font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-md">{diag.recommendedBudgetMode}</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">2. Atenção & Diagnóstico</span>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-lg">
+                        {diag.riskLevel === 'Crítico' ? '🚨' : diag.riskLevel === 'Alto' ? '⚠️' : diag.riskLevel === 'Médio' ? '⚖️' : '✨'}
+                      </span>
+                      <span className={`text-xs font-bold ${
+                        diag.riskLevel === 'Crítico' ? 'text-rose-600 dark:text-rose-400' :
+                        diag.riskLevel === 'Alto' ? 'text-amber-600 dark:text-amber-400' :
+                        'text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        Nível de Risco: {diag.riskLevel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                      <strong className="text-slate-700 dark:text-slate-300 font-bold block mb-1">{diag.mainProblem?.title}</strong>
+                      {diag.mainProblem?.desc}
+                    </p>
+                  </div>
+                  {diag.biggestDrain && (
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/60 pt-2 truncate">
+                      Maior dreno de caixa: <span className="font-extrabold text-rose-600 dark:text-rose-400">{diag.biggestDrain.category} ({formatCurrency(diag.biggestDrain.amount)})</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">3. Recomendação Inteligente</span>
+                    <div className="flex items-start gap-2">
+                      <Lightbulb size={16} className="text-indigo-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
+                        {diag.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                  {diag.biggestDebt && (
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/60 pt-2 truncate">
+                      Foco de dívida: <span className="font-bold text-indigo-600 dark:text-indigo-400">{diag.biggestDebt.description} ({formatCurrency(diag.biggestDebt.totalAmount)})</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                  <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10 flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">✨ Pontos Fortes</span>
+                    <ul className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-4 leading-tight">
+                      {diag.strongPoints?.slice(0, 3).map((pt, i) => <li key={i}>{pt}</li>)}
+                      {(!diag.strongPoints || diag.strongPoints.length === 0) && <li>Nenhum ponto de destaque positivo registrado ainda.</li>}
+                    </ul>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/10 flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1">⚠️ Pontos de Atenção</span>
+                    <ul className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-4 leading-tight">
+                      {diag.attentionPoints?.slice(0, 3).map((pt, i) => <li key={i}>{pt}</li>)}
+                      {(!diag.attentionPoints || diag.attentionPoints.length === 0) && <li>Tudo limpo! Sem preocupações imediatas extras detectadas.</li>}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                {raioX.mission}
-              </p>
-            </div>
-          </div>
-        </div>
+            )}
 
-      </div>
-    </motion.div>
-  );
+            {raioXTab === 'saude' && (
+              <div className="flex flex-col lg:flex-row gap-6 items-center">
+                <div className="flex flex-col items-center justify-center shrink-0 w-full lg:w-1/3">
+                  <div className="relative w-36 h-36 flex items-center justify-center">
+                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="42"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        className="text-slate-100 dark:text-slate-800"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="42"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        className={`${
+                          diag.metrics.healthScore >= 85 ? 'text-emerald-500' :
+                          diag.metrics.healthScore >= 70 ? 'text-emerald-400' :
+                          diag.metrics.healthScore >= 50 ? 'text-sky-500' :
+                          diag.metrics.healthScore >= 30 ? 'text-amber-500' :
+                          'text-rose-500'
+                        } transition-all duration-1000 ease-out`}
+                        strokeDasharray="264"
+                        strokeDashoffset={264 - (264 * diag.metrics.healthScore) / 100}
+                        strokeLinecap="round"
+                        fill="transparent"
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center text-center">
+                      <span className="text-4xl font-black text-slate-800 dark:text-slate-50 leading-none">
+                        {diag.metrics.healthScore}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mt-1">Pontos</span>
+                    </div>
+                  </div>
+
+                  <span className={`mt-3 px-3 py-0.5 rounded-full text-xs font-black uppercase ${scoreBg} ${scoreColor}`}>
+                    {diag.metrics.healthScore >= 80 ? 'Excelente' :
+                     diag.metrics.healthScore >= 60 ? 'Boa Saúde' :
+                     diag.metrics.healthScore >= 40 ? 'Regular' : 'Crítica'}
+                  </span>
+                </div>
+
+                <div className="flex-1 w-full">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-3">Critérios de Cálculo de Saúde Financeira</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {[
+                      { label: 'Liquidez em Conta', value: diag.metrics.healthScoreDetails?.liquidityScore || 0, max: 20, icon: '💧' },
+                      { label: 'Controle de Dívidas', value: diag.metrics.healthScoreDetails?.debtScore || 0, max: 20, icon: '🎯' },
+                      { label: 'Taxa de Poupança', value: diag.metrics.healthScoreDetails?.savingsScore || 0, max: 20, icon: '🐷' },
+                      { label: 'Reserva de Emergência', value: diag.metrics.healthScoreDetails?.emergencyReserveScore || 0, max: 20, icon: '🛡️' },
+                      { label: 'Regularidade da Renda', value: diag.metrics.healthScoreDetails?.incomeRegularityScore || 0, max: 10, icon: '📅' },
+                      { label: 'Progresso das Metas', value: diag.metrics.healthScoreDetails?.goalsScore || 0, max: 10, icon: '🎯' }
+                    ].map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50 flex flex-col justify-between">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-xs shrink-0">{item.icon}</span>
+                          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">{item.label}</span>
+                        </div>
+                        <div className="flex items-end justify-between">
+                          <span className="text-sm font-black text-slate-800 dark:text-slate-100">{item.value.toFixed(0)}</span>
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">máx {item.max}</span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                          <div 
+                            className="h-full bg-indigo-500 dark:bg-indigo-400" 
+                            style={{ width: `${(item.value / item.max) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {raioXTab === 'tendencias' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Evolução Líquida</span>
+                    <div className="flex items-center gap-2">
+                      {diag.metrics.trends?.status === 'Melhorando' ? (
+                        <TrendingUp className="text-emerald-500 shrink-0" size={18} />
+                      ) : diag.metrics.trends?.status === 'Piorando' ? (
+                        <TrendingDown className="text-rose-500 shrink-0" size={18} />
+                      ) : (
+                        <Activity className="text-indigo-500 shrink-0" size={18} />
+                      )}
+                      <span className={`text-sm font-bold ${
+                        diag.metrics.trends?.status === 'Melhorando' ? 'text-emerald-600 dark:text-emerald-400' :
+                        diag.metrics.trends?.status === 'Piorando' ? 'text-rose-600 dark:text-rose-400' :
+                        'text-indigo-600 dark:text-indigo-400'
+                      }`}>
+                        {diag.metrics.trends?.status || 'Estável'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal mt-1">
+                      {diag.metrics.trends?.statusExplanation}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Estabilidade de Renda</span>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-1">
+                      💼 {diag.metrics.trends?.incomeStability || 'Estável'}
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal mt-1.5">
+                      Avalia o desvio padrão de suas entradas ativas nos últimos meses.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Alerta de Crescimento</span>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5 mt-1">
+                      📈 {diag.metrics.trends?.topGrowingExpenseCategory ? diag.metrics.trends.topGrowingExpenseCategory : 'Nenhuma categoria em aceleração'}
+                    </div>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal mt-1.5">
+                      {diag.metrics.trends?.topGrowingExpenseCategory 
+                        ? `A categoria ${diag.metrics.trends.topGrowingExpenseCategory} cresceu de peso em relação aos meses anteriores.`
+                        : 'Seus custos categorizados mantêm-se regulares sem saltos abruptos.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
+                  <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block mb-2">Comportamento de Consumo Detectado</span>
+                  <div className="space-y-2">
+                    {diag.metrics.behaviorPatterns?.map((pattern, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                        <span className="text-indigo-500 flex-shrink-0 mt-0.5">•</span>
+                        <span>{pattern}</span>
+                      </div>
+                    ))}
+                    {(!diag.metrics.behaviorPatterns || diag.metrics.behaviorPatterns.length === 0) && (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 block italic">Analisando comportamentos de transações cadastradas...</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {raioXTab === 'previsoes' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Previsão de Saldo (7 Dias)</span>
+                    <span className={`text-base font-black block mt-1 ${diag.metrics.cashFlowForecast?.balance7D >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(diag.metrics.cashFlowForecast?.balance7D || 0)}
+                    </span>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-normal">
+                      Saldo em conta estimado considerando despesas fixas prorrateadas e contas pendentes a vencer nos próximos 7 dias.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Previsão de Saldo (30 Dias)</span>
+                    <span className={`text-base font-black block mt-1 ${diag.metrics.cashFlowForecast?.balance30D >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(diag.metrics.cashFlowForecast?.balance30D || 0)}
+                    </span>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-normal">
+                      Resultado planejado ao fim do ciclo atual de competência com base em suas receitas estimadas e todas as despesas lançadas.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50">
+                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1">Tempo Limite de Caixa</span>
+                    <span className="text-base font-black block mt-1 text-indigo-600 dark:text-indigo-400">
+                      {diag.metrics.cashFlowForecast?.daysUntilZero !== null && diag.metrics.cashFlowForecast?.daysUntilZero !== undefined ? (
+                        diag.metrics.cashFlowForecast.daysUntilZero === 0 ? '🚨 Caixa Zerado' : `⏳ ${diag.metrics.cashFlowForecast.daysUntilZero} dias`
+                      ) : (
+                        `🛡️ ${diag.metrics.runwayMonths?.toFixed(1)} meses`
+                      )}
+                    </span>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-normal">
+                      {diag.metrics.cashFlowForecast?.daysUntilZero !== null && diag.metrics.cashFlowForecast?.daysUntilZero !== undefined
+                        ? 'Seu caixa mensal está deficitário. Indica em quantos dias seus recursos em conta zerarão neste ritmo.'
+                        : 'Sua reserva de emergência e saldos cobrem esse tempo de despesas totais (Survival runway).'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-800/30 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+                  <div className="text-center">
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Sobras Mensais</span>
+                    <span className={`text-sm font-black ${diag.metrics.monthlySurplus >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {formatCurrency(diag.metrics.monthlySurplus)}
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Pressão de Caixa (30D)</span>
+                    <span className={`text-sm font-black ${diag.metrics.cashFlowPressure30D > 100 ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      {diag.metrics.cashFlowPressure30D?.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Comprometimento DTI</span>
+                    <span className={`text-sm font-black ${diag.metrics.dtiRatio > 36 ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      {diag.metrics.dtiRatio?.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-bold">Custos de Vida Fixo</span>
+                    <span className={`text-sm font-black ${diag.metrics.fixedOverheadIndex > 65 ? 'text-rose-600 dark:text-rose-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      {diag.metrics.fixedOverheadIndex?.toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {raioXTab === 'simulador' && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                  Ajuste os valores abaixo para simular cenários de melhoria financeira ("E se...?") e veja o impacto instantâneo calculado de forma determinística no seu Score, Modo e Reserva!
+                </p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-3.5 bg-slate-50 dark:bg-slate-800/30 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                    <div>
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <span>Aumento de Renda Mensal (+ R$)</span>
+                        <span className="text-indigo-600 dark:text-indigo-400">{formatCurrency(simIncomeIncrease)}</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="5000"
+                        step="100"
+                        value={simIncomeIncrease}
+                        onChange={e => setSimIncomeIncrease(parseFloat(e.target.value))}
+                        className="w-full accent-indigo-600"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        <span>Economia em Gastos Supérfluos (- R$)</span>
+                        <span className="text-indigo-600 dark:text-indigo-400">{formatCurrency(simExpenseDecrease)}</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="3000"
+                        step="50"
+                        value={simExpenseDecrease}
+                        onChange={e => setSimExpenseDecrease(parseFloat(e.target.value))}
+                        className="w-full accent-indigo-600"
+                      />
+                    </div>
+
+                    {debts.length > 0 && (
+                      <div>
+                        <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          <span>Quitação/Amortização de Dívidas (R$)</span>
+                          <span className="text-indigo-600 dark:text-indigo-400">{formatCurrency(simDebtReduction)}</span>
+                        </div>
+                        <input 
+                          type="range"
+                          min="0"
+                          max={Math.round(debts.reduce((sum, d) => sum + d.totalAmount, 0))}
+                          step="100"
+                          value={simDebtReduction}
+                          onChange={e => setSimDebtReduction(parseFloat(e.target.value))}
+                          className="w-full accent-indigo-600"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        onClick={() => {
+                          setSimIncomeIncrease(0);
+                          setSimExpenseDecrease(0);
+                          setSimDebtReduction(0);
+                        }}
+                        className="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-500/10 hover:bg-rose-500/15 py-1 px-3 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <RotateCcw size={10} />
+                        Limpar Simulações
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-500/[0.02] border border-indigo-500/10 flex flex-col justify-between">
+                    <div>
+                      <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block mb-3.5">Resultado Simulado</span>
+                      
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-100 dark:border-slate-800/60">
+                          <span className="font-semibold text-slate-500">Índice de Saúde:</span>
+                          <div className="flex items-center gap-1.5 font-black text-slate-800 dark:text-slate-100">
+                            {fullDiagnosis.metrics.healthScore !== diag.metrics.healthScore && (
+                              <span className="text-[10px] line-through text-slate-400">{fullDiagnosis.metrics.healthScore}</span>
+                            )}
+                            <span className={
+                              diag.metrics.healthScore >= 80 ? 'text-emerald-500' :
+                              diag.metrics.healthScore >= 60 ? 'text-sky-500' :
+                              diag.metrics.healthScore >= 40 ? 'text-amber-500' :
+                              'text-rose-500'
+                            }>
+                              {diag.metrics.healthScore} / 100
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-100 dark:border-slate-800/60">
+                          <span className="font-semibold text-slate-500">Modo de Saúde Reativo:</span>
+                          <div className="flex items-center gap-1.5 font-bold">
+                            {fullDiagnosis.mode !== diag.mode && (
+                              <span className="text-[10px] line-through text-slate-400">{fullDiagnosis.mode}</span>
+                            )}
+                            <span className={`text-[10px] uppercase font-black tracking-wide border px-2 py-0.5 rounded-md ${getModeColor(diag.mode)}`}>
+                              {diag.mode}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-100 dark:border-slate-800/60">
+                          <span className="font-semibold text-slate-500">Sobrevivência da Reserva (Runway):</span>
+                          <div className="flex items-center gap-1.5 font-black text-slate-800 dark:text-slate-100">
+                            {fullDiagnosis.metrics.runwayMonths !== diag.metrics.runwayMonths && (
+                              <span className="text-[10px] line-through text-slate-400">{fullDiagnosis.metrics.runwayMonths?.toFixed(1)}m</span>
+                            )}
+                            <span>{diag.metrics.runwayMonths?.toFixed(1)} meses</span>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs pb-1">
+                          <span className="font-semibold text-slate-500">Novas Sobras Mensais:</span>
+                          <div className="flex items-center gap-1.5 font-black text-slate-800 dark:text-slate-100">
+                            {fullDiagnosis.metrics.monthlySurplus !== diag.metrics.monthlySurplus && (
+                              <span className="text-[10px] line-through text-slate-400">{formatCurrency(fullDiagnosis.metrics.monthlySurplus)}</span>
+                            )}
+                            <span className={diag.metrics.monthlySurplus >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                              {formatCurrency(diag.metrics.monthlySurplus)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-4 leading-normal italic border-t border-slate-100 dark:border-slate-800/60 pt-2 text-center">
+                      Cálculos em tempo real baseados em inteligência regulatória e lógica determinística.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
+    );
+  };
 
   const renderContas = () => {
     const totalPatrimonio = accounts.reduce((sum, curr) => sum + (accountBalances[curr.id] || 0), 0);
@@ -1319,6 +1832,108 @@ export function Dashboard({
           )}
         </div>
       )}
+      {(() => {
+        const unconfirmed = fullDiagnosis.parsedCommitments.filter(c => c.source === 'nota_geral' && c.amount && c.amount > 0);
+        if (unconfirmed.length === 0) return null;
+
+        const handleConfirmCommitment = (c: typeof unconfirmed[0]) => {
+          if (!addTransaction || !c.amount) return;
+          
+          let txType: 'income' | 'expense' | 'transfer_to_savings' = 'expense';
+          let bucket: Bucket = 'Necessidades';
+          let category = c.category || 'Outros';
+
+          if (c.type === 'receita') {
+            txType = 'income';
+            bucket = 'Renda';
+            category = 'Entradas';
+          } else if (c.type === 'divida') {
+            txType = 'expense';
+            bucket = 'Reserva/Dívidas';
+            category = 'Passivos';
+          } else if (c.type === 'oportunidade') {
+            txType = 'transfer_to_savings';
+            bucket = 'Reserva/Dívidas';
+            category = 'Poupança';
+          } else if (c.type === 'despesa') {
+            txType = 'expense';
+            bucket = 'Necessidades';
+            category = 'Contas Fixas';
+          }
+
+          let date = `${data.monthId}-01`;
+          if (c.dateStr) {
+            const match = c.dateStr.match(/(\d+)/);
+            if (match) {
+              const day = Math.max(1, Math.min(28, parseInt(match[1])));
+              date = `${data.monthId}-${String(day).padStart(2, '0')}`;
+            }
+          } else {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (todayStr.startsWith(data.monthId)) {
+              date = todayStr;
+            }
+          }
+
+          addTransaction(data.monthId, {
+            type: txType,
+            amount: c.amount,
+            description: c.text,
+            date,
+            bucket,
+            category,
+            isPending: false,
+            account: 'banco'
+          });
+        };
+
+        return (
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800/60">
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2.5 flex items-center gap-1.5">
+              <span>✨</span> Anotações Inteligentes Detectadas
+            </h4>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3 leading-relaxed">
+              O Copiloto identificou compromissos em seu texto. Clique para confirmar e lançá-los como transações reais:
+            </p>
+            <div className="space-y-2">
+              {unconfirmed.map((c, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700/80 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base shrink-0">
+                      {c.type === 'receita' ? '💰' : c.type === 'divida' ? '🎯' : c.type === 'oportunidade' ? '🛡️' : '📅'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate leading-snug">{c.text}</p>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1.5 mt-0.5">
+                        <span className="font-semibold uppercase tracking-wider bg-slate-150 dark:bg-slate-800 px-1.5 py-0.2 rounded-md text-[9px]">
+                          {c.category}
+                        </span>
+                        <span>•</span>
+                        <span>{c.dateStr || 'Neste ciclo'}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-black text-slate-800 dark:text-slate-200 font-mono">
+                      {formatCurrency(c.amount || 0)}
+                    </span>
+                    <button
+                      onClick={() => handleConfirmCommitment(c)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white p-1.5 rounded-xl text-[10px] font-bold shadow-sm flex items-center justify-center gap-1 transition-all cursor-pointer h-8 w-8"
+                      title="Confirmar e Lançar Transação"
+                    >
+                      <Check size={14} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 
