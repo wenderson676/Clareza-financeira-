@@ -45,7 +45,8 @@ export default function App() {
     importState,
     setUserName,
     setBudgetMode,
-    setCardOrder
+    setCardOrder,
+    addCustomCategory
   } = useStore();
 
   const [currentTab, setCurrentTab] = useState<Tab>('dashboard');
@@ -704,6 +705,8 @@ export default function App() {
           initialTab={initialTransactionTab}
           accountBalances={getAccountBalancesUpToMonth(monthId)}
           accounts={state.accounts}
+          customCategories={state.customCategories}
+          addCustomCategory={addCustomCategory}
         />
 
         <ActionMenuModal

@@ -62,6 +62,7 @@ export function Dashboard({
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
+  const [activeHealthCard, setActiveHealthCard] = useState<{ label: string; desc: string; icon: string } | null>(null);
   const [chartViewType, setChartViewType] = useState<'pizza' | 'barras'>('pizza');
   const [chartDataType, setChartDataType] = useState<'expense' | 'income'>('expense');
   
@@ -907,15 +908,58 @@ export function Dashboard({
                   <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-3">Critérios de Cálculo de Saúde Financeira</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
-                      { label: 'Liquidez em Conta', value: diag.metrics.healthScoreDetails?.liquidityScore || 0, max: 20, icon: '💧' },
-                      { label: 'Controle de Dívidas', value: diag.metrics.healthScoreDetails?.debtScore || 0, max: 20, icon: '🎯' },
-                      { label: 'Taxa de Poupança', value: diag.metrics.healthScoreDetails?.savingsScore || 0, max: 20, icon: '🐷' },
-                      { label: 'Reserva de Emergência', value: diag.metrics.healthScoreDetails?.emergencyReserveScore || 0, max: 20, icon: '🛡️' },
-                      { label: 'Regularidade da Renda', value: diag.metrics.healthScoreDetails?.incomeRegularityScore || 0, max: 10, icon: '📅' },
-                      { label: 'Progresso das Metas', value: diag.metrics.healthScoreDetails?.goalsScore || 0, max: 10, icon: '🎯' }
+                      { 
+                        label: 'Liquidez em Conta', 
+                        value: diag.metrics.healthScoreDetails?.liquidityScore || 0, 
+                        max: 20, 
+                        icon: '💧',
+                        desc: 'Mede o saldo disponível em suas contas correntes e bancos em relação às despesas mensais. Manter liquidez positiva evita juros de cheque especial e pendências financeiras imediatas.'
+                      },
+                      { 
+                        label: 'Controle de Dívidas', 
+                        value: diag.metrics.healthScoreDetails?.debtScore || 0, 
+                        max: 20, 
+                        icon: '🎯',
+                        desc: 'Avalia o comprometimento da sua renda mensal com dívidas e parcelas (DTI). Um menor comprometimento de parcelas significa maior liberdade no seu fluxo de caixa mensal.'
+                      },
+                      { 
+                        label: 'Taxa de Poupança', 
+                        value: diag.metrics.healthScoreDetails?.savingsScore || 0, 
+                        max: 20, 
+                        icon: '🐷',
+                        desc: 'Percentual de sobra real sobre a renda que foi economizada no mês atual. Recomenda-se poupar e investir pelo menos 15% a 20% do que você ganha para expansão de patrimônio.'
+                      },
+                      { 
+                        label: 'Reserva de Emergência', 
+                        value: diag.metrics.healthScoreDetails?.emergencyReserveScore || 0, 
+                        max: 20, 
+                        icon: '🛡️',
+                        desc: 'Mede quantos meses de custos mensais os seus ativos acumulados conseguem sustentar se você perder todas as fontes de receita hoje (Survival Runway). O ideal é ter entre 3 a 6 meses.'
+                      },
+                      { 
+                        label: 'Regularidade da Renda', 
+                        value: diag.metrics.healthScoreDetails?.incomeRegularityScore || 0, 
+                        max: 10, 
+                        icon: '📅',
+                        desc: 'Mede o quão constantes são suas receitas recorrentes comparadas aos meses anteriores. Uma receita estável traz mais previsibilidade e menos oscilações bruscas de caixa.'
+                      },
+                      { 
+                        label: 'Progresso das Metas', 
+                        value: diag.metrics.healthScoreDetails?.goalsScore || 0, 
+                        max: 10, 
+                        icon: '🎯',
+                        desc: 'Acompanha o percentual de conclusão e os valores poupados direcionados aos seus objetivos e metas financeiras registradas. Reflete seu avanço prático rumo às conquistas.'
+                      }
                     ].map((item, idx) => (
-                      <div key={idx} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50 flex flex-col justify-between">
-                        <div className="flex items-center gap-1.5 mb-1.5">
+                      <div key={idx} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100/50 dark:border-slate-800/50 flex flex-col justify-between relative group">
+                        <button
+                          onClick={() => setActiveHealthCard({ label: item.label, desc: item.desc, icon: item.icon })}
+                          className="absolute top-2 right-2 text-slate-300 hover:text-indigo-500 dark:text-slate-600 dark:hover:text-indigo-400 transition-colors p-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                          title={`Como entender: ${item.label}`}
+                        >
+                          <HelpCircle size={13} />
+                        </button>
+                        <div className="flex items-center gap-1.5 mb-1.5 pr-4">
                           <span className="text-xs shrink-0">{item.icon}</span>
                           <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 leading-tight truncate">{item.label}</span>
                         </div>
@@ -2155,6 +2199,49 @@ export function Dashboard({
                 <button
                   onClick={() => setActiveInfo(null)}
                   className="w-full mt-6 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-medium rounded-xl py-3 transition-colors"
+                >
+                  Entendi
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {activeHealthCard && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setActiveHealthCard(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-indigo-500/10 text-indigo-500 text-lg">
+                      {activeHealthCard.icon}
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                      {activeHealthCard.label}
+                    </h3>
+                  </div>
+                  <button onClick={() => setActiveHealthCard(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                    <X size={24} />
+                  </button>
+                </div>
+                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                  {activeHealthCard.desc}
+                </p>
+                <button
+                  onClick={() => setActiveHealthCard(null)}
+                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl py-3 transition-colors cursor-pointer"
                 >
                   Entendi
                 </button>

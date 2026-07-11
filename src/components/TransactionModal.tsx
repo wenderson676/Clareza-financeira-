@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 import { Transaction, TransactionType, Bucket, AccountType, Account } from '../types';
 import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
-import { useStore } from '../lib/store';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -14,10 +13,25 @@ interface TransactionModalProps {
   initialTab?: 'expense' | 'income' | 'transfer';
   accountBalances?: Record<string, number>;
   accounts?: Account[];
+  customCategories?: {
+    expense?: string[];
+    income?: string[];
+    transfer?: string[];
+  };
+  addCustomCategory?: (type: 'expense' | 'income' | 'transfer', category: string) => void;
 }
 
-export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, initialTab, accountBalances, accounts }: TransactionModalProps) {
-  const { state, addCustomCategory } = useStore();
+export function TransactionModal({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  editingTransaction, 
+  initialTab, 
+  accountBalances, 
+  accounts,
+  customCategories,
+  addCustomCategory
+}: TransactionModalProps) {
   const [formTab, setFormTab] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [transferFrom, setTransferFrom] = useState<AccountType>('banco');
   const [transferTo, setTransferTo] = useState<AccountType>('reserva');
@@ -36,7 +50,7 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
   const getAvailableCategories = () => {
     if (formTab === 'income') {
       const defaultCats = CATEGORIES['Renda'] || [];
-      const customCats = state.customCategories?.income || [];
+      const customCats = customCategories?.income || [];
       return [...defaultCats, ...customCats];
     } else if (formTab === 'transfer') {
       const defaultCats = [
@@ -46,11 +60,11 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
         'Investimentos',
         'Ajuste de Conta'
       ];
-      const customCats = state.customCategories?.transfer || [];
+      const customCats = customCategories?.transfer || [];
       return [...defaultCats, ...customCats];
     } else {
       const defaultCats = CATEGORIES[bucket] || [];
-      const customCats = state.customCategories?.expense || [];
+      const customCats = customCategories?.expense || [];
       return [...defaultCats, ...customCats];
     }
   };
@@ -62,7 +76,9 @@ export function TransactionModal({ isOpen, onClose, onSave, editingTransaction, 
     if (!trimmed) return;
     
     const type = formTab === 'expense' ? 'expense' : formTab === 'income' ? 'income' : 'transfer';
-    addCustomCategory(type, trimmed);
+    if (addCustomCategory) {
+      addCustomCategory(type, trimmed);
+    }
     setCategory(trimmed);
     setNewCatName('');
     setIsAddingCustom(false);
