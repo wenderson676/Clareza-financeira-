@@ -224,7 +224,7 @@ export function Dashboard({
     .reduce((sum, t) => sum + t.amount, 0);
 
   const totalExpenses = data.transactions
-    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending)
+    .filter(t => t.type === 'expense' && !t.isPending)
     .reduce((sum, t) => sum + t.amount, 0);
 
   const isReserva = (id?: string) => id === 'reserva' || accounts.find(a => a.id === id)?.type === 'reserva';
@@ -309,7 +309,7 @@ export function Dashboard({
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedExpenses = data.transactions
-    .filter(t => t.type === 'expense' && t.bucket !== 'Reserva/Dívidas')
+    .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
   const projectedBalance = useMemo(() => {
