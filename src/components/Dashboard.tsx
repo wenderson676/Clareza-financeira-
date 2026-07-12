@@ -158,12 +158,14 @@ export function Dashboard({
   const [accFormName, setAccFormName] = useState('');
   const [accFormIcon, setAccFormIcon] = useState('🏦');
   const [accFormIsMain, setAccFormIsMain] = useState(false);
+  const [accFormInitialBalance, setAccFormInitialBalance] = useState('');
 
   const handleOpenEditAccount = (acc: Account) => {
     setEditingAccount(acc);
     setAccFormName(acc.name);
     setAccFormIcon(acc.icon);
     setAccFormIsMain(!!acc.isMain);
+    setAccFormInitialBalance(acc.initialBalance ? acc.initialBalance.toString() : '0');
     setShowCreateAccount(false);
   };
 
@@ -172,6 +174,7 @@ export function Dashboard({
     setAccFormName('');
     setAccFormIcon('💳');
     setAccFormIsMain(false);
+    setAccFormInitialBalance('');
     setShowCreateAccount(true);
   };
 
@@ -183,18 +186,22 @@ export function Dashboard({
   const handleSaveAccountForm = () => {
     if (!accFormName.trim()) return;
 
+    const initialBalanceNum = parseFloat(accFormInitialBalance.replace(',', '.')) || 0;
+
     if (showCreateAccount) {
       addAccount?.({
         name: accFormName.trim(),
         icon: accFormIcon,
         isMain: accFormIsMain,
-        type: 'custom'
+        type: 'custom',
+        initialBalance: initialBalanceNum
       });
     } else if (editingAccount) {
       updateAccount?.(editingAccount.id, {
         name: accFormName.trim(),
         icon: accFormIcon,
-        isMain: accFormIsMain
+        isMain: accFormIsMain,
+        initialBalance: initialBalanceNum
       });
     }
 
@@ -239,7 +246,7 @@ export function Dashboard({
   const accountBalances = useMemo(() => {
     const balances: Record<string, number> = {};
     accounts.forEach(acc => {
-      balances[acc.id] = 0;
+      balances[acc.id] = acc.initialBalance || 0;
     });
     if (balances['banco'] === undefined) balances['banco'] = 0;
     if (balances['reserva'] === undefined) balances['reserva'] = 0;
@@ -2417,6 +2424,18 @@ export function Dashboard({
                           className="w-12 text-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-1 px-1.5 outline-none font-medium text-sm"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Saldo Inicial (R$)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={accFormInitialBalance}
+                        onChange={e => setAccFormInitialBalance(e.target.value)}
+                        placeholder="Ex: 1500,00"
+                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-3 px-4 outline-none focus:border-indigo-500 transition-all font-medium text-sm"
+                      />
                     </div>
 
                     <div className="flex items-center gap-2.5 py-1">

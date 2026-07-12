@@ -74,7 +74,7 @@ export function useStore() {
     const balances: Record<string, number> = {};
     
     currentAccounts.forEach(acc => {
-      balances[acc.id] = 0;
+      balances[acc.id] = acc.initialBalance || 0;
     });
     if (balances['banco'] === undefined) balances['banco'] = 0;
     if (balances['reserva'] === undefined) balances['reserva'] = 0;
@@ -135,10 +135,16 @@ export function useStore() {
   };
 
   const getAccumulatedBalance = (targetMonthId: string): number => {
-    let balance = 0;
-    const targetDate = parse(targetMonthId, 'yyyy-MM', new Date());
-    
     const isReserva = (id?: string) => id === 'reserva' || state.accounts?.find(a => a.id === id)?.type === 'reserva';
+    
+    let balance = (state.accounts || []).reduce((acc, currentAccount) => {
+      if (!isReserva(currentAccount.id)) {
+        return acc + (currentAccount.initialBalance || 0);
+      }
+      return acc;
+    }, 0);
+    
+    const targetDate = parse(targetMonthId, 'yyyy-MM', new Date());
 
     Object.values(state.monthlyData).forEach((month: any) => {
       const monthDate = parse(month.monthId, 'yyyy-MM', new Date());

@@ -9,6 +9,7 @@ export interface Account {
   icon: string; // e.g., "🏦", "💰", "💵", etc.
   isMain?: boolean;
   type: 'banco' | 'reserva' | 'carteira' | 'custom';
+  initialBalance?: number;
 }
 
 export interface Debt {

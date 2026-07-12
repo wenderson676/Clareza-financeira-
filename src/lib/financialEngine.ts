@@ -309,6 +309,15 @@ export function generateFinancialDiagnosis(
   let reservaBal = 0;
   
   const isReserva = (id?: string) => id === 'reserva' || accounts.find(a => a.id === id)?.type === 'reserva';
+  
+  // Initialize with initial balances from accounts
+  accounts.forEach(acc => {
+    if (isReserva(acc.id)) {
+      reservaBal += (acc.initialBalance || 0);
+    } else {
+      bancoBal += (acc.initialBalance || 0);
+    }
+  });
 
   allTxs.filter(t => !t.isPending).forEach(t => {
     const amt = t.amount;
