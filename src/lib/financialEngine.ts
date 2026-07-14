@@ -70,8 +70,8 @@ export interface FinancialDiagnosis {
   mainProblem: { title: string; desc: string };
   strongPoints: string[];
   attentionPoints: string[];
-  biggestDrain: string | null;
-  biggestDebt: string | null;
+  biggestDrain: { category: string; amount: number } | null;
+  biggestDebt: { description: string; totalAmount: number } | null;
   recommendation: string;
   metrics: FinancialMetrics;
   parsedCommitments: ParsedCommitment[];
@@ -558,7 +558,7 @@ export function generateFinancialDiagnosis(
     return acc;
   }, {} as Record<string, number>);
   const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-  const biggestDrain = sortedCats.length > 0 && sortedCats[0][1] > 0 ? sortedCats[0][0] : null;
+  const biggestDrain = sortedCats.length > 0 && sortedCats[0][1] > 0 ? { category: sortedCats[0][0], amount: sortedCats[0][1] } : null;
 
   // Analyze spending categories globally to find trends
   const expenseCategories = allTxs.filter(t => t.type === 'expense').reduce((acc, t) => {
@@ -575,7 +575,7 @@ export function generateFinancialDiagnosis(
 
   // Find biggest debt
   const sortedDebts = [...debts].sort((a, b) => b.totalAmount - a.totalAmount);
-  const biggestDebt = sortedDebts.length > 0 ? sortedDebts[0].name : null;
+  const biggestDebt = sortedDebts.length > 0 ? { description: sortedDebts[0].name, totalAmount: sortedDebts[0].totalAmount } : null;
 
   // 8. Generate Multi-Month Projections (next 3 periods)
   const projections: FinancialProjection[] = [];
