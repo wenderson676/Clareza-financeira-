@@ -1267,7 +1267,10 @@ export function Dashboard({
   };
 
   const renderContas = () => {
-    const totalPatrimonio = accounts.reduce((sum, curr) => sum + (accountBalances[curr.id] || 0), 0);
+    const totalPatrimonio = accounts.reduce((sum, curr) => sum + (accountBalances[curr.id] || 0), 0) 
+      + (accounts.find(a => a.id === 'banco') ? 0 : (accountBalances['banco'] || 0)) 
+      + (accounts.find(a => a.id === 'carteira') ? 0 : (accountBalances['carteira'] || 0))
+      + (accounts.find(a => a.id === 'reserva') ? 0 : (accountBalances['reserva'] || 0));
 
     return (
       <motion.div 

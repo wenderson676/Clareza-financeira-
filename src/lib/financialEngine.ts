@@ -341,8 +341,8 @@ export function generateFinancialDiagnosis(
   });
 
   const currentBalance = bancoBal;
-  const totalSaved = goals.reduce((acc, g) => acc + g.currentAmount, 0) + reservaBal;
-  const totalAssets = Math.max(0, currentBalance) + totalSaved;
+  const totalSaved = reservaBal;
+  const totalAssets = bancoBal + reservaBal;
 
   // 3. Debt metrics
   const totalDebtAmount = debts.reduce((acc, d) => acc + d.totalAmount, 0);
