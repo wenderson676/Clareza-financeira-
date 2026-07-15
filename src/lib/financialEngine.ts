@@ -652,7 +652,7 @@ export function generateFinancialDiagnosis(
   // Attention points
   const attentionPoints: string[] = [];
   if (fixedOverheadIndex > 70) attentionPoints.push(`Suas contas fixas estão muito altas (${fixedOverheadIndex.toFixed(0)}% da renda). Tente abaixar esse peso.`);
-  if (biggestDrain) attentionPoints.push(`Identificamos um padrão de gastos elevados em desejos na categoria: "${biggestDrain}".`);
+  if (biggestDrain) attentionPoints.push(`Identificamos um padrão de gastos elevados em desejos na categoria: "${biggestDrain.category}".`);
   if (topExpenseCategories.length > 0) attentionPoints.push(`Suas maiores saídas gerais costumam ser em: ${topExpenseCategories.join(', ')}.`);
   if (totalDebtAmount > adjustedIncome * 2 && totalDebtAmount > 0) attentionPoints.push('Sua dívida total acumulada é maior que duas vezes sua renda mensal. Cuidado com o acúmulo.');
   if (runwayMonths < 1 && adjustedExpenses > 0) attentionPoints.push('Sua reserva dura menos de 1 mês. Qualquer imprevisto pode te deixar apertado.');
@@ -694,8 +694,8 @@ export function generateFinancialDiagnosis(
     insights.push(`Sua parcela total de dívidas compromete ${dtiRatio.toFixed(1)}% do orçamento. Reduzir esse índice é prioridade máxima.`);
   } else if (biggestDrain && fixedOverheadIndex < 70 && mode !== 'Expansão') {
     const drainWeeklyCap = adjustedIncome > 0 ? (adjustedIncome * 0.05) / 4 : 50;
-    recommendation = `Gasto impulsivo detectado na categoria "${biggestDrain}". Sugestão: Adicione um teto de gasto semanal de ${formatBRL(drainWeeklyCap)} para esta categoria até normalizar.`;
-    insights.push(`O excesso recente em "${biggestDrain}" está corroendo silenciosamente sua capacidade de poupança.`);
+    recommendation = `Gasto impulsivo detectado na categoria "${biggestDrain.category}". Sugestão: Adicione um teto de gasto semanal de ${formatBRL(drainWeeklyCap)} para esta categoria até normalizar.`;
+    insights.push(`O excesso recente em "${biggestDrain.category}" está corroendo silenciosamente sua capacidade de poupança.`);
   } else if (savingsRate > 20 && runwayMonths > 3) {
     const autoSave = adjustedIncome * 0.2;
     recommendation = `Sobra consistente! Você acumulou ${formatBRL(monthlySurplus)} de excedente este mês. Sugestão: Automatize a transferência de ${formatBRL(autoSave / 4)} por semana para investimentos.`;
@@ -712,7 +712,7 @@ export function generateFinancialDiagnosis(
   
   if (biggestDrain) {
     const drainWeeklyCap = adjustedIncome > 0 ? (adjustedIncome * 0.05) / 4 : 50;
-    actionPlan.today.push(`Colocar um limite rígido hoje na categoria "${biggestDrain}". Teto sugerido: ${formatBRL(drainWeeklyCap)} por semana.`);
+    actionPlan.today.push(`Colocar um limite rígido hoje na categoria "${biggestDrain.category}". Teto sugerido: ${formatBRL(drainWeeklyCap)} por semana.`);
   }
 
   noteExpenses.forEach(c => {
