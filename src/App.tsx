@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle, Copyright, Sparkles, Heart } from 'lucide-react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle, Copyright, Sparkles, Heart, Copy, Check } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Comparison } from './components/Comparison';
@@ -7,6 +7,7 @@ import { Planning } from './components/Planning';
 import { TransactionModal } from './components/TransactionModal';
 import { ActionMenuModal } from './components/ActionMenuModal';
 import { GoalModal } from './components/GoalModal';
+import { DonationModal } from './components/DonationModal';
 import { TutorialTour } from './components/TutorialTour';
 import { useStore } from './lib/store';
 import { format, addMonths, subMonths, parse } from 'date-fns';
@@ -66,6 +67,7 @@ export default function App() {
 
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [isInstallApkModalOpen, setIsInstallApkModalOpen] = useState(false);
+  const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [installPlatform, setInstallPlatform] = useState<'android' | 'ios'>('android');
   const [feedbackText, setFeedbackText] = useState('');
@@ -75,6 +77,12 @@ export default function App() {
   });
   const [feedbackPopupVisible, setFeedbackPopupVisible] = useState(false);
   const [feedbackPopupStep, setFeedbackPopupStep] = useState<'ask' | 'info'>('ask');
+
+  const [donationBannerVisible, setDonationBannerVisible] = useState(false);
+  const [donationCopied, setDonationCopied] = useState(false);
+  const [dontShowDonation, setDontShowDonation] = useState(() => {
+    return localStorage.getItem('clareza_donation_dont_show') === 'true';
+  });
 
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -132,6 +140,52 @@ export default function App() {
       clearInterval(intervalTimer);
     };
   }, [dontShowFeedbackPopup]);
+
+  // Periodic non-intrusive donation notification
+  useEffect(() => {
+    if (dontShowDonation) return;
+
+    const nextPromptTime = localStorage.getItem('clareza_donation_next_prompt');
+    if (nextPromptTime && Date.now() < parseInt(nextPromptTime, 10)) {
+      return;
+    }
+
+    // Show non-intrusive donation banner after 25 seconds of app use
+    const timer = setTimeout(() => {
+      setDonationBannerVisible(true);
+    }, 25000);
+
+    return () => clearTimeout(timer);
+  }, [dontShowDonation]);
+
+  const handleDismissDonation = (rememberLater: boolean = true) => {
+    setDonationBannerVisible(false);
+    if (rememberLater) {
+      // Postpone next prompt for 3 days
+      const nextTime = Date.now() + 3 * 24 * 60 * 60 * 1000;
+      localStorage.setItem('clareza_donation_next_prompt', nextTime.toString());
+    }
+  };
+
+  const handleDontShowDonationChange = (checked: boolean) => {
+    if (checked) {
+      localStorage.setItem('clareza_donation_dont_show', 'true');
+      setDontShowDonation(true);
+      setDonationBannerVisible(false);
+    } else {
+      localStorage.removeItem('clareza_donation_dont_show');
+      setDontShowDonation(false);
+    }
+  };
+
+  const handleCopyPixFromBanner = () => {
+    navigator.clipboard.writeText('2f4304ec-b441-4cb3-91fb-e5203b7ce479');
+    setDonationCopied(true);
+    setTimeout(() => {
+      setDonationCopied(false);
+      handleDismissDonation(true);
+    }, 2000);
+  };
 
   const handleDontShowFeedbackChange = (checked: boolean) => {
     if (checked) {
@@ -423,6 +477,28 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* DONATION SECTION */}
+                  <div className="space-y-2">
+                    <h3 className="px-3 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Apoie o Projeto</h3>
+                    <div className="space-y-1">
+                      <button 
+                        onClick={() => {
+                          setIsDonationModalOpen(true);
+                          setIsSidebarOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500/10 via-pink-500/10 to-amber-500/10 hover:from-rose-500/20 hover:via-pink-500/20 hover:to-amber-500/20 border border-rose-200/70 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 font-bold text-xs transition-all text-left cursor-pointer group shadow-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Heart size={16} className="text-rose-500 fill-rose-500/30 group-hover:scale-110 transition-transform" />
+                          <span>Apoiar o Criador (Pix)</span>
+                        </div>
+                        <span className="text-[10px] bg-rose-600 text-white font-extrabold px-2 py-0.5 rounded-full shadow-xs">
+                          Pix
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* HELP & APP SECTION */}
                   <div className="space-y-2">
                     <h3 className="px-3 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Ajuda e Aplicativo</h3>
@@ -484,7 +560,17 @@ export default function App() {
                     <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
                       Wenderson Gomes
                     </p>
-                    <div className="flex items-center justify-center gap-1 mt-0.5 text-[9px] text-slate-400 dark:text-slate-500 font-semibold">
+                    <button
+                      onClick={() => {
+                        setIsDonationModalOpen(true);
+                        setIsSidebarOpen(false);
+                      }}
+                      className="text-[11px] text-rose-600 dark:text-rose-400 font-bold hover:underline flex items-center justify-center gap-1 mt-1 cursor-pointer transition-colors"
+                    >
+                      <Heart size={12} className="fill-rose-500 text-rose-500" />
+                      <span>Fazer uma doação Pix</span>
+                    </button>
+                    <div className="flex items-center justify-center gap-1 mt-1 text-[9px] text-slate-400 dark:text-slate-500 font-semibold">
                       <Copyright size={9} />
                       <span>2026 Todos os direitos reservados</span>
                     </div>
@@ -722,6 +808,93 @@ export default function App() {
           onUpdate={updateGoal}
           editingGoal={editingGoal}
         />
+
+        <DonationModal
+          isOpen={isDonationModalOpen}
+          onClose={() => setIsDonationModalOpen(false)}
+        />
+
+        {/* Floating Non-invasive Donation Prompt */}
+        <AnimatePresence>
+          {donationBannerVisible && (
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="fixed bottom-22 left-4 right-4 bg-white dark:bg-slate-900 border border-rose-200/80 dark:border-rose-900/40 rounded-2xl p-4 shadow-2xl z-[45] flex flex-col gap-3 max-w-lg mx-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                    <Heart size={20} className="fill-rose-500/30 animate-pulse" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
+                        Apoie o Criador do APK
+                      </h4>
+                      <span className="text-[9px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-500/20">
+                        Pix
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                      O Clareza é 100% gratuito e sem anúncios! Se este aplicativo tem sido útil para o seu dia a dia, considere fazer uma doação via Pix de qualquer valor para incentivar o projeto.
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleDismissDonation(true)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 cursor-pointer shrink-0"
+                  aria-label="Fechar"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setDonationBannerVisible(false);
+                      setIsDonationModalOpen(true);
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-md shadow-rose-500/20 cursor-pointer"
+                  >
+                    <Heart size={14} className="fill-white/30" />
+                    <span>Ver Pix / Doar</span>
+                  </button>
+
+                  <button
+                    onClick={handleCopyPixFromBanner}
+                    className="py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-emerald-200/50 dark:border-emerald-500/20 cursor-pointer"
+                  >
+                    {donationCopied ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{donationCopied ? 'Chave Copiada!' : 'Copiar Pix'}</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 dark:text-slate-500">
+                  <button
+                    onClick={() => handleDismissDonation(true)}
+                    className="hover:text-slate-600 dark:hover:text-slate-300 underline cursor-pointer"
+                  >
+                    Lembrar mais tarde
+                  </button>
+
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={dontShowDonation}
+                      onChange={(e) => handleDontShowDonationChange(e.target.checked)}
+                      className="w-3 h-3 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <span>Não mostrar novamente</span>
+                  </label>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Floating Non-invasive Feedback Prompt */}
         <AnimatePresence>
