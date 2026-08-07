@@ -38,6 +38,7 @@ interface PlanningProps {
   goals: Goal[];
   accounts: Account[];
   onSaveNote?: (note: string) => void;
+  onSetBudgetMode?: (mode: BudgetMode) => void;
 }
 
 export function Planning({ 
@@ -48,10 +49,12 @@ export function Planning({
   debts, 
   goals, 
   accounts,
-  onSaveNote 
+  onSaveNote,
+  onSetBudgetMode
 }: PlanningProps) {
   
   const [selectedMetricHelp, setSelectedMetricHelp] = useState<string | null>(null);
+  const [justAppliedMode, setJustAppliedMode] = useState(false);
 
   // Friendly explanations for metrics
   const metricDescriptions: Record<string, { title: string; desc: string }> = {
@@ -193,20 +196,41 @@ export function Planning({
                   {diagnosis.recommendation}
                 </p>
                 {diagnosis.recommendedBudgetMode && diagnosis.recommendedBudgetMode !== budgetMode && (
-                  <div className="mt-3 p-3 bg-white/50 dark:bg-slate-950/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs text-slate-600 dark:text-slate-400">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">Recomendação de Configuração:</span> O modelo financeiro identificou que seu momento requer a distribuição <span className="font-bold text-indigo-600 dark:text-indigo-400">{
-                      diagnosis.recommendedBudgetMode === '90-5-5' ? 'Crise (90/5/5)' :
-                      diagnosis.recommendedBudgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
-                      diagnosis.recommendedBudgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
-                      diagnosis.recommendedBudgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
-                      'Padrão (50/30/20)'
-                    }</span>, mas você está operando em <b>{
-                      budgetMode === '90-5-5' ? 'Crise (90/5/5)' :
-                      budgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
-                      budgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
-                      budgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
-                      'Padrão (50/30/20)'
-                    }</b>. Para alterar, use a configuração de Divisão de Orçamento (ícone de alvo).
+                  <div className="mt-3 p-3.5 bg-gradient-to-br from-indigo-50/80 via-purple-50/50 to-emerald-50/80 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-emerald-950/40 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/50 text-xs text-slate-700 dark:text-slate-300 space-y-2.5 shadow-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-extrabold text-indigo-900 dark:text-indigo-200 block text-[11px] uppercase tracking-wider">Configuração Recomendada:</span>
+                        <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                          O modelo identificou que seu momento financeiro requer a distribuição <strong className="text-indigo-600 dark:text-indigo-400 font-extrabold">{
+                            diagnosis.recommendedBudgetMode === '90-5-5' ? 'Crise (90/5/5)' :
+                            diagnosis.recommendedBudgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
+                            diagnosis.recommendedBudgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
+                            diagnosis.recommendedBudgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
+                            'Padrão (50/30/20)'
+                          }</strong>, mas você está em <span className="font-bold">{
+                            budgetMode === '90-5-5' ? 'Crise (90/5/5)' :
+                            budgetMode === '80-10-10' ? 'Sobrevivência (80/10/10)' :
+                            budgetMode === '70-0-30' ? 'Quitar Dívidas (70/0/30)' :
+                            budgetMode === '50-20-30' ? 'Prosperar (50/20/30)' :
+                            'Padrão (50/30/20)'
+                          }</span>.
+                        </p>
+                      </div>
+                    </div>
+
+                    {onSetBudgetMode && (
+                      <button
+                        onClick={() => {
+                          onSetBudgetMode(diagnosis.recommendedBudgetMode as BudgetMode);
+                          setJustAppliedMode(true);
+                          setTimeout(() => setJustAppliedMode(false), 3000);
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 cursor-pointer"
+                      >
+                        <Zap size={14} className="fill-white/30" />
+                        <span>{justAppliedMode ? '✨ Configuração Aplicada!' : `Aplicar Recomendação (${diagnosis.recommendedBudgetMode})`}</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

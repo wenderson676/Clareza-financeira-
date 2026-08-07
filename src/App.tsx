@@ -754,6 +754,7 @@ export default function App() {
               deleteAccount={deleteAccount}
               onTogglePending={toggleTransactionPending}
               addTransaction={addTransaction}
+              onSetBudgetMode={setBudgetMode}
             />
           )}
           {currentTab === 'transactions' && (
@@ -776,6 +777,7 @@ export default function App() {
               goals={state.goals}
               accounts={state.accounts || []}
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
+              onSetBudgetMode={setBudgetMode}
             />
           )}
           {currentTab === 'comparison' && (

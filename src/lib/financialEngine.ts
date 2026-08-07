@@ -493,14 +493,14 @@ export function generateFinancialDiagnosis(
   let riskLevel: RiskLevel = 'Moderado';
   let mainProblem = { title: '', desc: '' };
 
-  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < -100) || (smoothedRunway < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35) || cashFlowPressure30D > 120;
+  const hasHighSurvivalRisk = hasLateDebts || (currentBalance < 0) || (totalAssets < 0) || (smoothedRunway < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35) || cashFlowPressure30D > 120;
 
   if (adjustedIncome === 0 && adjustedExpenses > 0) {
     mode = 'Crise';
     riskLevel = 'Crítico';
     mainProblem = {
       title: 'Ausência de Renda',
-      desc: 'Você ainda não registrou dinheiro entrando este mês para cobrir as saídas. Verifique suas receitas.'
+      desc: `Você ainda não registrou entradas financeiras este mês para cobrir suas despesas de R$ ${adjustedExpenses.toFixed(2)}. Registre suas receitas ou resgates.`
     };
   } else if (hasHighSurvivalRisk) {
     mode = 'Crise';
@@ -508,46 +508,59 @@ export function generateFinancialDiagnosis(
     mainProblem = {
       title: 'Crise de Curto Prazo',
       desc: hasLateDebts 
-        ? 'Contas em atraso estão sufocando seu fluxo de caixa de curto prazo.' 
-        : 'Sua pressão de caixa para os próximos 30 dias está muito alta. Risco de déficit iminente.'
+        ? 'Atenção! Você possui contas ou parcelas de dívida em atraso que acumulam juros e sufocam seu orçamento.' 
+        : (currentBalance < 0 || totalAssets < 0)
+        ? 'Seu saldo bancário está em terreno negativo. Cuidado com juros altos de cheque especial.'
+        : 'Sua pressão de caixa para os próximos 30 dias ultrapassa 120%. Risco grave de déficit iminente.'
     };
-  } else if (smoothedFixedOverhead > 75 || smoothedRunway < 1 || cashFlowPressure30D > 90) {
+  } else if (smoothedFixedOverhead > 75 || smoothedRunway < 1 || cashFlowPressure30D > 90 || (monthlySurplus < 0 && smoothedRunway < 1.5)) {
     mode = 'Sobrevivência';
     riskLevel = 'Alto';
     mainProblem = {
       title: 'Sobrevivência Pressionada',
-      desc: 'As obrigações essenciais engolem quase toda sua disponibilidade de recursos. A pressão de caixa exige atenção rápida.'
+      desc: monthlySurplus < 0 
+        ? `Você está operando em déficit mensal (gastou R$ ${Math.abs(monthlySurplus).toFixed(2)} a mais do que ganhou) e sua reserva cobre menos de 1,5 mês.` 
+        : 'As obrigações essenciais consomem mais de 75% da sua receita ou sua reserva dura menos de 1 mês. Foco total em cortar supérfluos.'
     };
-  } else if (smoothedRunway < 3 || cashFlowPressure30D > 60) {
+  } else if (monthlySurplus < 0) {
+    mode = 'Estabilização';
+    riskLevel = 'Moderado';
+    mainProblem = {
+      title: 'Déficit Mensal de Caixa',
+      desc: `Suas saídas superaram suas receitas este mês em R$ ${Math.abs(monthlySurplus).toFixed(2)}. Embora sua reserva ofereça fôlego, o déficit contínuo corrói seu patrimônio.`
+    };
+  } else if (smoothedRunway < 3 || cashFlowPressure30D > 60 || dtiRatio > 25) {
     mode = 'Estabilização';
     riskLevel = 'Moderado';
     mainProblem = {
       title: 'Estabilização em Progresso',
-      desc: 'Suas contas básicas estão em dia, mas sua reserva de segurança ainda é frágil para suportar imprevistos severos.'
+      desc: dtiRatio > 25
+        ? `Suas parcelas de dívidas comprometem ${dtiRatio.toFixed(0)}% da sua renda (limite recomendado: 20%). Foque na amortização.`
+        : 'Suas contas básicas estão em dia, mas sua reserva de emergência ainda cobre menos de 3 meses de despesas.'
     };
-  } else if (totalDebtAmount === 0 && smoothedSavingsRate > 15 && smoothedRunway >= 3) {
-    if (smoothedRunway >= 6 && smoothedSavingsRate > 35) {
+  } else if (smoothedSavingsRate > 15 && smoothedRunway >= 3 && !hasLateDebts && dtiRatio <= 25) {
+    if (smoothedRunway >= 6 && smoothedSavingsRate > 30 && dtiRatio <= 15) {
       mode = 'Expansão';
       riskLevel = 'Mínimo';
       mainProblem = {
         title: 'Fase de Expansão',
-        desc: 'Sua saúde financeira é excelente. Seu fluxo de caixa está muito confortável para acelerar a multiplicação de patrimônio.'
+        desc: 'Sua saúde financeira é excelente! Zero atrasos, parcelas sob controle, taxa de poupança alta e reserva sólida para mais de 6 meses.'
       };
     } else {
       mode = 'Construção';
       riskLevel = 'Baixo';
       mainProblem = {
         title: 'Fase de Construção',
-        desc: 'Você possui sobras consistentes e risco muito baixo. Momento ideal para escalar suas metas de poupança e investimentos.'
+        desc: 'Sua situação é muito sólida. Renda superior às despesas, taxa de poupança acima de 15% e reserva de segurança para mais de 3 meses.'
       };
     }
   } else {
-    // Fallback default if debts exist or savings rate is lower but runway is >= 3
+    // Fallback default if savings rate is lower or dti > 25% but runway is >= 3
     mode = 'Estabilização';
     riskLevel = 'Moderado';
     mainProblem = {
-      title: 'Consolidação de Reserva',
-      desc: 'Você possui um bom fôlego financeiro (Runway), mas ainda precisa quitar dívidas ou elevar sua taxa de poupança para entrar na Construção.'
+      title: 'Consolidação de Reserva e Dívidas',
+      desc: 'Sua reserva de emergência tem um bom patamar, mas para avançar para a Fase de Construção é necessário elevar sua taxa de poupança acima de 15% ou reduzir seu endividamento.'
     };
   }
 
@@ -788,11 +801,14 @@ export function generateFinancialDiagnosis(
   }
 
   let recommendedBudgetMode = '50-30-20';
-  if (mode === 'Crise') recommendedBudgetMode = '90-5-5';
-  else if (mode === 'Sobrevivência') {
+  if (mode === 'Crise') {
+    recommendedBudgetMode = '90-5-5';
+  } else if (hasLateDebts || dtiRatio > 25 || totalDebtMonthly > 0.25 * adjustedIncome) {
+    recommendedBudgetMode = '70-0-30';
+  } else if (mode === 'Sobrevivência') {
     recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '80-10-10';
   } else if (mode === 'Estabilização') {
-    recommendedBudgetMode = activeDebts.length > 0 ? '70-0-30' : '50-30-20';
+    recommendedBudgetMode = (dtiRatio > 15 || activeDebts.length > 0) ? '70-0-30' : '50-30-20';
   } else if (mode === 'Expansão' || mode === 'Construção') {
     recommendedBudgetMode = '50-20-30';
   }
@@ -804,25 +820,25 @@ export function generateFinancialDiagnosis(
   if (adjustedIncome === 0 && adjustedExpenses > 0) {
     explanation = 'O Modo Crise foi ativado porque suas despesas estão registradas mas nenhuma renda foi lançada para este período.';
   } else if (hasHighSurvivalRisk) {
-    explanation = `O Modo Crise foi ativado porque: ${hasLateDebts ? 'há contas/dívidas em atraso registradas' : ''} ${currentBalance < -100 ? 'seu saldo em conta está negativo' : ''} ${runwayMonths < 0.2 && adjustedExpenses > 0 && totalDebtMonthly > adjustedIncome * 0.35 ? 'sua reserva é baixíssima para cobrir o peso atual das parcelas' : ''} ${cashFlowPressure30D > 120 ? 'a pressão de fluxo de caixa para 30 dias ultrapassa o limite seguro de 120%' : ''}.`;
-  } else if (fixedOverheadIndex > 75 || runwayMonths < 1 || cashFlowPressure30D > 90) {
-    explanation = `O Modo Sobrevivência foi ativado porque suas despesas fixas de sobrevivência consomem mais de 75% da sua renda (${fixedOverheadIndex.toFixed(0)}%), sua reserva de segurança cobre menos de 1 mês (${runwayMonths.toFixed(1)} meses) ou a pressão de caixa nos próximos 30 dias está excessivamente alta (${cashFlowPressure30D.toFixed(0)}%).`;
-  } else if (runwayMonths < 3 || cashFlowPressure30D > 60) {
-    explanation = `O Modo Estabilização foi ativado porque você possui contas em dia e saldo estável, mas sua reserva cobre menos que 3 meses de custos de vida (${runwayMonths.toFixed(1)} meses), ou sua pressão de caixa de 30 dias requer monitoramento (${cashFlowPressure30D.toFixed(0)}%).`;
-  } else if (totalDebtAmount === 0 && savingsRate > 20 && runwayMonths >= 3) {
-    if (runwayMonths >= 6 && savingsRate > 35) {
-      explanation = `O Modo Expansão foi ativado porque sua saúde financeira é espetacular: você tem zero dívidas, taxa de poupança acima de 35% (${savingsRate.toFixed(0)}%) e reserva confortável de mais de 6 meses de custos (${runwayMonths.toFixed(1)} meses).`;
-    } else {
-      explanation = `O Modo Construção foi ativado porque você não possui dívidas ativas, sua taxa de poupança mensal supera 20% (${savingsRate.toFixed(0)}%) e sua reserva cobre mais de 3 meses (${runwayMonths.toFixed(1)} meses).`;
-    }
+    explanation = `O Modo Crise foi ativado devido a fatores críticos: ${hasLateDebts ? 'há contas/dívidas em atraso registradas;' : ''}${currentBalance < 0 || totalAssets < 0 ? ' saldo bancário ou patrimônio em terreno negativo;' : ''}${cashFlowPressure30D > 120 ? ' pressão de caixa nos próximos 30 dias acima de 120%;' : ''}`;
+  } else if (fixedOverheadIndex > 75 || runwayMonths < 1 || cashFlowPressure30D > 90 || (monthlySurplus < 0 && smoothedRunway < 1.5)) {
+    explanation = `O Modo Sobrevivência foi ativado porque ${fixedOverheadIndex > 75 ? `suas contas essenciais consomem ${fixedOverheadIndex.toFixed(0)}% da sua renda (acima de 75%)` : ''}${runwayMonths < 1 ? ` sua reserva cobre apenas ${runwayMonths.toFixed(1)} meses de custos` : ''}${monthlySurplus < 0 ? ` você está operando em déficit de R$ ${Math.abs(monthlySurplus).toFixed(2)} este mês` : ''}.`;
+  } else if (monthlySurplus < 0) {
+    explanation = `O Modo Estabilização foi ativado com Alerta de Déficit: você gastou R$ ${Math.abs(monthlySurplus).toFixed(2)} a mais do que recebeu este mês. É necessário ajustar o orçamento para proteger sua reserva de ${runwayMonths.toFixed(1)} meses.`;
+  } else if (smoothedRunway < 3 || cashFlowPressure30D > 60 || dtiRatio > 25) {
+    explanation = `O Modo Estabilização foi ativado porque ${dtiRatio > 25 ? `sua taxa de comprometimento de renda com dívidas é de ${dtiRatio.toFixed(0)}%` : `sua reserva financeira cobre ${runwayMonths.toFixed(1)} meses (meta recomendada: 3 a 6 meses)`}.`;
+  } else if (mode === 'Expansão') {
+    explanation = `O Modo Expansão foi ativado porque sua saúde financeira é excelente: zero atrasos, baixa relação dívida/renda (${dtiRatio.toFixed(0)}%), taxa de poupança alta (${savingsRate.toFixed(0)}%) e reserva sólida para ${runwayMonths.toFixed(1)} meses.`;
+  } else if (mode === 'Construção') {
+    explanation = `O Modo Construção foi ativado porque suas despesas estão controladas, você possui sobra financeira recorrente (${savingsRate.toFixed(0)}% poupado) e reserva para ${runwayMonths.toFixed(1)} meses.`;
   } else {
-    explanation = `O Modo Estabilização foi ativado por padrão para consolidar seus hábitos, manter suas sobras positivas (${savingsRate.toFixed(0)}% poupado) e fortalecer sua reserva inicial.`;
+    explanation = `O Modo Estabilização foi mantido para consolidar seu hábito de poupança (${savingsRate.toFixed(0)}%) e equilibrar seu fluxo de caixa.`;
   }
 
   // 2. Financial Health Score (0 to 100)
-  const liquidityScore = Math.min(20, Math.max(0, adjustedExpenses > 0 ? (Math.max(0, currentBalance) / (adjustedExpenses * 1.5)) * 20 : (currentBalance > 0 ? 20 : 0)));
+  const liquidityScore = Math.min(20, Math.max(0, adjustedExpenses > 0 ? (Math.max(0, totalAssets) / (adjustedExpenses * 1.5)) * 20 : (totalAssets > 0 ? 20 : 0)));
   const baseDebtScore = totalDebtAmount === 0 ? 20 : Math.max(0, 20 * (1 - dtiRatio / 50));
-  const debtScore = Math.max(0, hasLateDebts ? baseDebtScore - 5 : baseDebtScore);
+  const debtScore = Math.max(0, hasLateDebts ? baseDebtScore - 12 : baseDebtScore);
   const savingsScore = Math.min(20, Math.max(0, (savingsRate / 30) * 20));
   const incomeRegularityScore = adjustedIncome === 0 ? 0 : (historicalMonths.length >= 3 ? 10 : (historicalMonths.length === 2 ? 8 : 5));
   const emergencyReserveScore = runwayMonths >= 6 ? 20 : (runwayMonths >= 3 ? 15 : Math.min(15, Math.max(0, (runwayMonths / 3) * 15)));

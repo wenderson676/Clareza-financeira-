@@ -34,6 +34,7 @@ interface DashboardProps {
   deleteAccount?: (id: string) => void;
   onTogglePending?: (monthId: string, id: string) => void;
   addTransaction?: (monthId: string, transaction: Omit<Transaction, 'id'>) => void;
+  onSetBudgetMode?: (mode: BudgetMode) => void;
 }
 
 export function Dashboard({ 
@@ -58,7 +59,8 @@ export function Dashboard({
   updateAccount,
   deleteAccount,
   onTogglePending,
-  addTransaction
+  addTransaction,
+  onSetBudgetMode
 }: DashboardProps) {
   const [quote, setQuote] = useState('');
   const [activeInfo, setActiveInfo] = useState<string | null>(null);
@@ -793,9 +795,20 @@ export function Dashboard({
                       {diag.metrics.explanation}
                     </p>
                   </div>
-                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/60 pt-2 flex justify-between items-center">
-                    <span>Divisão de Orçamento Recomendada:</span>
-                    <span className="font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-md">{diag.recommendedBudgetMode}</span>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-3 border-t border-slate-100 dark:border-slate-800/60 pt-2 flex justify-between items-center gap-1">
+                    <span>Divisão Recomendada:</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded-md">{diag.recommendedBudgetMode}</span>
+                      {diag.recommendedBudgetMode && diag.recommendedBudgetMode !== budgetMode && onSetBudgetMode && (
+                        <button
+                          onClick={() => onSetBudgetMode(diag.recommendedBudgetMode as BudgetMode)}
+                          className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-md transition-all shadow-xs cursor-pointer flex items-center gap-1"
+                          title={`Trocar da divisão ${budgetMode} para a recomendada ${diag.recommendedBudgetMode}`}
+                        >
+                          <span>Aplicar</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
