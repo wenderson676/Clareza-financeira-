@@ -236,6 +236,9 @@ export function Dashboard({
     .reduce((sum, t) => {
       const act = t.account || 'banco';
       const toAct = t.toAccount;
+      if (t.type === 'transfer_between_accounts' && isReserva(act) && isReserva(toAct)) {
+        return sum; // Net zero change to savings
+      }
       if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
         return sum + t.amount;
       }
@@ -1752,6 +1755,9 @@ export function Dashboard({
                 if (t.isPending) return mSum;
                 const act = t.account || 'banco';
                 const toAct = t.toAccount;
+                if (t.type === 'transfer_between_accounts' && isReserva(act) && isReserva(toAct)) {
+                  return mSum;
+                }
                 if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
                   return mSum + t.amount;
                 }

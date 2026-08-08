@@ -469,10 +469,31 @@ export function generateFinancialDiagnosis(
           const prevSavingsRate = prevTotalInc > 0 ? (Math.max(0, prevSurplus) / prevTotalInc) * 100 : 0;
           const prevFixedOverhead = prevTotalInc > 0 ? ((prevNecessities + totalDebtMonthly) / prevTotalInc) * 100 : (prevNecessities > 0 ? 999 : 0);
           
-          let prevAssets = totalAssets;
-          if (prevSurplus !== 0) {
-            prevAssets = Math.max(0, totalAssets - monthlySurplus);
-          }
+          let prevAssets = bancoBal + reservaBal; // baseline (current)
+          
+          // Revert transactions that happened after prevMonthId to get accurate prevAssets
+          Object.values(allData).forEach(mData => {
+            if (mData.monthId > prevMonthId && mData.monthId <= currentMonthData.monthId) {
+              const mtxs = mData.transactions || [];
+              mtxs.filter(t => !t.isPending).forEach(t => {
+                const amt = t.amount;
+                const act = t.account || 'banco';
+                const toAct = t.toAccount;
+                
+                if (t.type === 'income') {
+                  if (isReserva(act)) prevAssets -= amt; else prevAssets -= amt;
+                } else if (t.type === 'expense') {
+                  if (isReserva(act)) prevAssets += amt; else prevAssets += amt;
+                } else if (t.type === 'transfer_to_savings') {
+                  // Net impact on totalAssets is zero, but just in case
+                } else if (t.type === 'transfer_from_savings') {
+                  // Net impact is zero
+                } else if (t.type === 'transfer_between_accounts') {
+                  // Net impact is zero
+                }
+              });
+            }
+          });
           const prevRunway = Math.min(99, prevTotalExp > 0 ? (prevAssets / prevTotalExp) : (prevAssets > 0 ? 99 : 0));
 
           runwaySum += prevRunway;
