@@ -67,8 +67,6 @@ export interface RecurrencePattern {
 export interface FinancialDiagnosis {
   mode: FinancialMode;
   riskLevel: RiskLevel;
-  dailyPriority: { title: string; description: string; type: 'alert' | 'success' | 'info' };
-  personalizedBudget?: { necessidades: number; dividas: number; desejos: number; reserva: number; text: string };
   mainProblem: { title: string; desc: string };
   strongPoints: string[];
   attentionPoints: string[];
@@ -1015,77 +1013,9 @@ export function generateFinancialDiagnosis(
     }
   }
 
-  // --- 8. Daily Priority ---
-  let dailyPriority = { title: '', description: '', type: 'info' as 'info' | 'alert' | 'success' };
-  
-  if (hasLateDebts) {
-    dailyPriority = {
-      title: 'Sua prioridade hoje',
-      description: `Regularizar as contas em atraso. Não faça compras supérfluas ou transferências para reservas antes de limpar isso.`,
-      type: 'alert'
-    };
-  } else if (cashFlowPressure30D > 100) {
-    dailyPriority = {
-      title: 'Alerta de Fluxo',
-      description: `Seus gastos previstos para os próximos 30 dias superam o dinheiro disponível. Freie os gastos não essenciais imediatamente.`,
-      type: 'alert'
-    };
-  } else if (trendStatus === 'Melhorando') {
-    dailyPriority = {
-      title: 'Boa evolução!',
-      description: `Sua sobra de caixa melhorou em relação ao mês anterior. Se mantiver esse ritmo, acelerará a construção da sua reserva e a quitação de dívidas.`,
-      type: 'success'
-    };
-  } else if (biggestDrain) {
-    dailyPriority = {
-      title: 'Atenção aos vazamentos',
-      description: `Sua categoria "${biggestDrain.category}" está consumindo muito. Tente não gastar nada com isso hoje.`,
-      type: 'info'
-    };
-  } else {
-    dailyPriority = {
-      title: 'Tudo sob controle',
-      description: 'Mantenha o bom hábito de registrar todas as movimentações. Nenhuma emergência detectada hoje.',
-      type: 'success'
-    };
-  }
-
-  // --- 9. Personalized Budget ---
-  let personalizedBudget = undefined;
-  if (adjustedIncome > 0) {
-    const totalDesires = txs.filter(t => t.type === 'expense' && t.bucket === 'Desejos').reduce((acc, t) => acc + t.amount, 0);
-    const rawNec = (totalNecessities / adjustedIncome) * 100;
-    const rawDebt = (totalDebtMonthly / adjustedIncome) * 100;
-    const rawDes = (totalDesires / adjustedIncome) * 100;
-    const rawRes = Math.max(0, 100 - rawNec - rawDebt - rawDes);
-
-    // Create an optimized budget close to their reality but pushing for some savings
-    let optNec = Math.min(80, Math.max(40, Math.round(rawNec)));
-    let optDebt = Math.round(rawDebt);
-    let optDes = Math.min(20, Math.max(5, Math.round(rawDes)));
-    
-    // Adjust if over 100
-    if (optNec + optDebt + optDes > 100) {
-      if (optDes > 5) optDes = 5;
-      if (optNec + optDebt + optDes > 100) optNec = 100 - optDebt - optDes;
-    }
-    
-    let optRes = 100 - optNec - optDebt - optDes;
-
-    personalizedBudget = {
-      necessidades: optNec,
-      dividas: optDebt,
-      desejos: optDes,
-      reserva: optRes,
-      text: `Seu orçamento personalizado (ajustado da sua realidade): Necessidades ${optNec}%, Dívidas ${optDebt}%, Desejos ${optDes}%, Reserva ${optRes}%.`
-    };
-  }
-
   return {
     mode,
     riskLevel,
-    dailyPriority,
-    personalizedBudget,
     mainProblem,
     strongPoints,
     attentionPoints,

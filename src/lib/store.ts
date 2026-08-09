@@ -403,15 +403,7 @@ export function useStore() {
   const setBudgetMode = (mode: BudgetMode) => {
     setState(prev => ({
       ...prev,
-      budgetMode: mode,
-      usePersonalizedBudget: false
-    }));
-  };
-
-  const setUsePersonalizedBudget = (usePersonalized: boolean) => {
-    setState(prev => ({
-      ...prev,
-      usePersonalizedBudget: usePersonalized
+      budgetMode: mode
     }));
   };
 
@@ -464,7 +456,6 @@ export function useStore() {
     importState,
     setUserName,
     setBudgetMode,
-    setUsePersonalizedBudget,
     setCardOrder,
     addCustomCategory
   };

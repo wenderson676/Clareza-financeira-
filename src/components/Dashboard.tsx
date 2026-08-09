@@ -26,8 +26,6 @@ interface DashboardProps {
   deleteDebt?: (id: string) => void;
   onSaveNote?: (note: string) => void;
   budgetMode?: BudgetMode;
-  usePersonalizedBudget?: boolean;
-  onSetUsePersonalizedBudget?: (val: boolean) => void;
   dashboardCardOrder?: string[];
   setCardOrder?: (order: string[]) => void;
   accounts?: Account[];
@@ -54,8 +52,6 @@ export function Dashboard({
   deleteDebt,
   onSaveNote, 
   budgetMode = '50-30-20',
-  usePersonalizedBudget = true,
-  onSetUsePersonalizedBudget,
   dashboardCardOrder = [],
   setCardOrder,
   accounts = [],
@@ -215,15 +211,7 @@ export function Dashboard({
     setShowCreateAccount(false);
   };
 
-  const modeBuckets = useMemo(() => {
-    const base = { ...getBucketsConfig(budgetMode) }; // Clone to avoid mutating original
-    if (fullDiagnosis.personalizedBudget && usePersonalizedBudget) {
-      if (base['Necessidades']) base['Necessidades'].percentage = fullDiagnosis.personalizedBudget.necessidades / 100;
-      if (base['Desejos']) base['Desejos'].percentage = fullDiagnosis.personalizedBudget.desejos / 100;
-      if (base['Reserva/Dívidas']) base['Reserva/Dívidas'].percentage = (fullDiagnosis.personalizedBudget.dividas + fullDiagnosis.personalizedBudget.reserva) / 100;
-    }
-    return base;
-  }, [budgetMode, fullDiagnosis.personalizedBudget, usePersonalizedBudget]);
+  const modeBuckets = useMemo(() => getBucketsConfig(budgetMode), [budgetMode]);
 
   useEffect(() => {
     setQuote(getRandomVerse());
@@ -1647,62 +1635,8 @@ export function Dashboard({
     );
   };
 
-  const renderEnvelopes = () => {
-    return (
-    <div key="envelopes" className="space-y-4 animate-fade-in">
-      {fullDiagnosis.personalizedBudget && (
-        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 p-4 rounded-3xl shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-2">
-              <div className="mt-0.5">
-                <Sparkles size={18} className="text-indigo-500" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                  Sugestão Inteligente de Orçamento
-                  <button 
-                    onClick={() => {
-                      const msg = `Por que uma Sugestão Personalizada?\n\nMuitas vezes os modelos padrões (como 50/30/20) são irreais para a nossa situação atual. Se os seus custos fixos já consomem 70% da sua renda, tentar seguir uma meta de 50% só vai gerar frustração.\n\nPara evitar isso, o Copiloto calcula uma divisão realista baseada nas suas despesas essenciais e dívidas atuais. Ele cria um orçamento possível de ser seguido hoje, garantindo que você ainda consiga destinar algo para a Reserva ou para quitar dívidas, mas sem ignorar o seu custo de vida real.\n\nVocê pode optar por seguir essa sugestão pé no chão ou tentar alcançar o modelo padrão das configurações.`;
-                      alert(msg);
-                    }}
-                    className="text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer ml-1"
-                    title="Entenda como é calculado"
-                  >
-                    <HelpCircle size={14} />
-                  </button>
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  O Copiloto analisou sua realidade ({fullDiagnosis.personalizedBudget.text.split(': ')[1]}) e sugere adaptar os baldes.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center bg-slate-100/80 dark:bg-slate-900/50 rounded-xl p-1 shrink-0 self-start sm:self-auto border border-slate-200/50 dark:border-slate-800/50">
-              <button
-                onClick={() => onSetUsePersonalizedBudget?.(true)}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
-                  usePersonalizedBudget 
-                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                Seguir Sugestão
-              </button>
-              <button
-                onClick={() => onSetUsePersonalizedBudget?.(false)}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
-                  !usePersonalizedBudget 
-                    ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                Manter {budgetMode}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  const renderEnvelopes = () => (
+    <div key="envelopes" className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
       {Object.entries(modeBuckets).map(([name, conf]) => {
         const config = conf as { percentage: number; color: string; text: string };
         const allocated = totalIncome * config.percentage;
@@ -1737,7 +1671,7 @@ export function Dashboard({
               <h3 className={`font-semibold ${config.text} dark:text-opacity-90 flex items-center gap-2`}>
                 <div className={`w-3 h-3 rounded-full ${config.color}`}></div>
                 {name}
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({Math.round(config.percentage * 100)}%)</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({config.percentage * 100}%)</span>
               </h3>
             </div>
             
@@ -1787,10 +1721,8 @@ export function Dashboard({
           </div>
         );
       })}
-      </div>
     </div>
-    );
-  };
+  );
 
   const renderDividas = () => {
     if (budgetMode !== '70-0-30' && debts.length === 0) return null;
@@ -2083,35 +2015,6 @@ export function Dashboard({
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Copiloto Financeiro - Prioridade do Dia */}
-      <div className={`p-5 rounded-3xl shadow-sm border ${
-        fullDiagnosis.dailyPriority.type === 'alert' 
-          ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/30' 
-          : fullDiagnosis.dailyPriority.type === 'success' 
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/30'
-            : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/30'
-      }`}>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xl">
-            {fullDiagnosis.dailyPriority.type === 'alert' ? '🚨' : fullDiagnosis.dailyPriority.type === 'success' ? '🎉' : '🧠'}
-          </span>
-          <h2 className={`font-bold text-sm tracking-wide ${
-            fullDiagnosis.dailyPriority.type === 'alert' ? 'text-rose-700 dark:text-rose-400' 
-            : fullDiagnosis.dailyPriority.type === 'success' ? 'text-emerald-700 dark:text-emerald-400'
-            : 'text-indigo-700 dark:text-indigo-400'
-          }`}>
-            {fullDiagnosis.dailyPriority.title}
-          </h2>
-        </div>
-        <p className={`text-sm leading-relaxed ${
-          fullDiagnosis.dailyPriority.type === 'alert' ? 'text-rose-800 dark:text-rose-300' 
-            : fullDiagnosis.dailyPriority.type === 'success' ? 'text-emerald-800 dark:text-emerald-300'
-            : 'text-indigo-800 dark:text-indigo-300'
-        }`}>
-          {fullDiagnosis.dailyPriority.description}
-        </p>
-      </div>
-
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors">
         <div className="grid grid-cols-3 items-center gap-2 sm:gap-4 mb-4">
           {/* Saldo Inicial - Esquerda */}

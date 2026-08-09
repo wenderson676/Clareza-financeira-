@@ -46,7 +46,6 @@ export default function App() {
     importState,
     setUserName,
     setBudgetMode,
-    setUsePersonalizedBudget,
     setCardOrder,
     addCustomCategory
   } = useStore();
@@ -747,8 +746,6 @@ export default function App() {
               deleteDebt={deleteDebt}
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
               budgetMode={state.budgetMode || '50-30-20'}
-              usePersonalizedBudget={state.usePersonalizedBudget !== false}
-              onSetUsePersonalizedBudget={setUsePersonalizedBudget}
               dashboardCardOrder={state.dashboardCardOrder || []}
               setCardOrder={setCardOrder}
               accounts={state.accounts}
