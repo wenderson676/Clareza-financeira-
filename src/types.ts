@@ -63,6 +63,7 @@ export interface AppState {
   assets: Asset[];
   userName?: string;
   budgetMode?: BudgetMode;
+  usePersonalizedBudget?: boolean;
   debts?: Debt[];
   dashboardCardOrder?: string[];
   accounts?: Account[];

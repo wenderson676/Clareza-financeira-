@@ -394,15 +394,21 @@ export function Planning({
             {/* Calculations and Surplus info */}
             <div className="bg-slate-100/50 dark:bg-slate-900/30 p-4 rounded-2xl text-xs space-y-2">
               <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium">
-                <span>Total de Recursos Disponíveis (Patrimônio Líquido Estimado):</span>
+                <span>Total de Recursos Disponíveis (Bancos + Reservas):</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{formatBRL(diagnosis.metrics.totalAssets)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium">
-                <span>Dívidas de Consumo/Passivos Ativos:</span>
+                <span>Dívidas Ativas (Passivos):</span>
                 <span className="font-bold text-rose-500">-{formatBRL(diagnosis.metrics.totalDebts)}</span>
               </div>
               <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium pt-2 border-t border-slate-200 dark:border-slate-800">
-                <span>Sobras Reais do Período (Superávit Livre):</span>
+                <span>Patrimônio Líquido (Recursos - Dívidas):</span>
+                <span className={`font-black ${(diagnosis.metrics.totalAssets - diagnosis.metrics.totalDebts) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  {formatBRL(diagnosis.metrics.totalAssets - diagnosis.metrics.totalDebts)}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 font-medium pt-2 border-t border-slate-200 dark:border-slate-800">
+                <span>Sobras Reais do Mês Atual (Receitas - Despesas):</span>
                 <span className={`font-black ${diagnosis.metrics.monthlySurplus >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {formatBRL(diagnosis.metrics.monthlySurplus)}
                 </span>

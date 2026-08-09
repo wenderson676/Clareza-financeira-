@@ -407,6 +407,13 @@ export function useStore() {
     }));
   };
 
+  const setUsePersonalizedBudget = (usePersonalized: boolean) => {
+    setState(prev => ({
+      ...prev,
+      usePersonalizedBudget: usePersonalized
+    }));
+  };
+
   const setCardOrder = (order: string[]) => {
     setState(prev => ({
       ...prev,
@@ -456,6 +463,7 @@ export function useStore() {
     importState,
     setUserName,
     setBudgetMode,
+    setUsePersonalizedBudget,
     setCardOrder,
     addCustomCategory
   };

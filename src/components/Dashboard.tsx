@@ -26,6 +26,8 @@ interface DashboardProps {
   deleteDebt?: (id: string) => void;
   onSaveNote?: (note: string) => void;
   budgetMode?: BudgetMode;
+  usePersonalizedBudget?: boolean;
+  onSetUsePersonalizedBudget?: (val: boolean) => void;
   dashboardCardOrder?: string[];
   setCardOrder?: (order: string[]) => void;
   accounts?: Account[];
@@ -52,6 +54,8 @@ export function Dashboard({
   deleteDebt,
   onSaveNote, 
   budgetMode = '50-30-20',
+  usePersonalizedBudget = true,
+  onSetUsePersonalizedBudget,
   dashboardCardOrder = [],
   setCardOrder,
   accounts = [],
@@ -213,13 +217,13 @@ export function Dashboard({
 
   const modeBuckets = useMemo(() => {
     const base = { ...getBucketsConfig(budgetMode) }; // Clone to avoid mutating original
-    if (fullDiagnosis.personalizedBudget) {
+    if (fullDiagnosis.personalizedBudget && usePersonalizedBudget) {
       if (base['Necessidades']) base['Necessidades'].percentage = fullDiagnosis.personalizedBudget.necessidades / 100;
       if (base['Desejos']) base['Desejos'].percentage = fullDiagnosis.personalizedBudget.desejos / 100;
       if (base['Reserva/Dívidas']) base['Reserva/Dívidas'].percentage = (fullDiagnosis.personalizedBudget.dividas + fullDiagnosis.personalizedBudget.reserva) / 100;
     }
     return base;
-  }, [budgetMode, fullDiagnosis.personalizedBudget]);
+  }, [budgetMode, fullDiagnosis.personalizedBudget, usePersonalizedBudget]);
 
   useEffect(() => {
     setQuote(getRandomVerse());
@@ -1643,13 +1647,59 @@ export function Dashboard({
     );
   };
 
-  const renderEnvelopes = () => (
+  const renderEnvelopes = () => {
+    return (
     <div key="envelopes" className="space-y-4 animate-fade-in">
       {fullDiagnosis.personalizedBudget && (
-        <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 p-4 rounded-2xl text-xs text-indigo-800 dark:text-indigo-300">
-          <span className="font-bold">Seu orçamento foi personalizado: </span>
-          Baseado na sua realidade, adaptamos as metas dos baldes para equilibrar suas finanças reais com seus objetivos. 
-          ({fullDiagnosis.personalizedBudget.text.split(': ')[1]})
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 p-4 rounded-3xl shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5">
+                <Sparkles size={18} className="text-indigo-500" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                  Sugestão Inteligente de Orçamento
+                  <button 
+                    onClick={() => {
+                      const msg = `Como funciona?\n\nO Copiloto analisa sua renda e despesas fixas (Necessidades), além de dívidas (se houver), e sugere uma distribuição ideal para você. Ele ajusta os percentuais para que sejam realistas para sua situação atual, sem abrir mão de guardar pelo menos o mínimo na Reserva.\n\nVocê pode optar por seguir essa sugestão ou voltar para o modelo padrão escolhido nas configurações.`;
+                      alert(msg);
+                    }}
+                    className="text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer ml-1"
+                    title="Entenda como é calculado"
+                  >
+                    <HelpCircle size={14} />
+                  </button>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  O Copiloto analisou sua realidade ({fullDiagnosis.personalizedBudget.text.split(': ')[1]}) e sugere adaptar os baldes.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center bg-slate-100/80 dark:bg-slate-900/50 rounded-xl p-1 shrink-0 self-start sm:self-auto border border-slate-200/50 dark:border-slate-800/50">
+              <button
+                onClick={() => onSetUsePersonalizedBudget?.(true)}
+                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  usePersonalizedBudget 
+                    ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Seguir Sugestão
+              </button>
+              <button
+                onClick={() => onSetUsePersonalizedBudget?.(false)}
+                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                  !usePersonalizedBudget 
+                    ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-sm' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                Manter {budgetMode}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1739,7 +1789,8 @@ export function Dashboard({
       })}
       </div>
     </div>
-  );
+    );
+  };
 
   const renderDividas = () => {
     if (budgetMode !== '70-0-30' && debts.length === 0) return null;
