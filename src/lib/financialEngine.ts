@@ -1053,6 +1053,7 @@ export function generateFinancialDiagnosis(
   // --- 9. Personalized Budget ---
   let personalizedBudget = undefined;
   if (adjustedIncome > 0) {
+    const totalDesires = txs.filter(t => t.type === 'expense' && t.bucket === 'Desejos').reduce((acc, t) => acc + t.amount, 0);
     const rawNec = (totalNecessities / adjustedIncome) * 100;
     const rawDebt = (totalDebtMonthly / adjustedIncome) * 100;
     const rawDes = (totalDesires / adjustedIncome) * 100;

@@ -1644,7 +1644,15 @@ export function Dashboard({
   };
 
   const renderEnvelopes = () => (
-    <div key="envelopes" className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+    <div key="envelopes" className="space-y-4 animate-fade-in">
+      {fullDiagnosis.personalizedBudget && (
+        <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 p-4 rounded-2xl text-xs text-indigo-800 dark:text-indigo-300">
+          <span className="font-bold">Seu orçamento foi personalizado: </span>
+          Baseado na sua realidade, adaptamos as metas dos baldes para equilibrar suas finanças reais com seus objetivos. 
+          ({fullDiagnosis.personalizedBudget.text.split(': ')[1]})
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {Object.entries(modeBuckets).map(([name, conf]) => {
         const config = conf as { percentage: number; color: string; text: string };
         const allocated = totalIncome * config.percentage;
@@ -1729,6 +1737,7 @@ export function Dashboard({
           </div>
         );
       })}
+      </div>
     </div>
   );
 
