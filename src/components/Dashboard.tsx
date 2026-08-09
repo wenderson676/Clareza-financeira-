@@ -1662,7 +1662,7 @@ export function Dashboard({
                   Sugestão Inteligente de Orçamento
                   <button 
                     onClick={() => {
-                      const msg = `Como funciona?\n\nO Copiloto analisa sua renda e despesas fixas (Necessidades), além de dívidas (se houver), e sugere uma distribuição ideal para você. Ele ajusta os percentuais para que sejam realistas para sua situação atual, sem abrir mão de guardar pelo menos o mínimo na Reserva.\n\nVocê pode optar por seguir essa sugestão ou voltar para o modelo padrão escolhido nas configurações.`;
+                      const msg = `Por que uma Sugestão Personalizada?\n\nMuitas vezes os modelos padrões (como 50/30/20) são irreais para a nossa situação atual. Se os seus custos fixos já consomem 70% da sua renda, tentar seguir uma meta de 50% só vai gerar frustração.\n\nPara evitar isso, o Copiloto calcula uma divisão realista baseada nas suas despesas essenciais e dívidas atuais. Ele cria um orçamento possível de ser seguido hoje, garantindo que você ainda consiga destinar algo para a Reserva ou para quitar dívidas, mas sem ignorar o seu custo de vida real.\n\nVocê pode optar por seguir essa sugestão pé no chão ou tentar alcançar o modelo padrão das configurações.`;
                       alert(msg);
                     }}
                     className="text-slate-400 hover:text-indigo-500 transition-colors cursor-pointer ml-1"
