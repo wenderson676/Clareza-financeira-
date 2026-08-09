@@ -403,7 +403,8 @@ export function useStore() {
   const setBudgetMode = (mode: BudgetMode) => {
     setState(prev => ({
       ...prev,
-      budgetMode: mode
+      budgetMode: mode,
+      usePersonalizedBudget: false
     }));
   };
 

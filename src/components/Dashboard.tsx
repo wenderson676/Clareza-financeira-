@@ -1737,7 +1737,7 @@ export function Dashboard({
               <h3 className={`font-semibold ${config.text} dark:text-opacity-90 flex items-center gap-2`}>
                 <div className={`w-3 h-3 rounded-full ${config.color}`}></div>
                 {name}
-                <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({config.percentage * 100}%)</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500 font-normal ml-1">({Math.round(config.percentage * 100)}%)</span>
               </h3>
             </div>
             
