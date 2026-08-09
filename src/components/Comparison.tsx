@@ -63,7 +63,7 @@ export function Comparison({ allData }: ComparisonProps) {
     const prevByCategory: Record<string, number> = {};
 
     allTransactions.forEach(t => {
-      if (t.type === 'expense' && t.bucket !== 'Reserva Financeira' && !t.isPending) {
+      if (t.type === 'expense' && t.bucket !== 'Reserva/Dívidas' && !t.isPending) {
         const d = parseISO(t.date);
         if (period === 'day' ? isSameDay(d, currentStart) : isCurrentPeriod(d)) {
           currentTotal += t.amount;

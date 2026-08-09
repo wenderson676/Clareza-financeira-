@@ -211,7 +211,15 @@ export function Dashboard({
     setShowCreateAccount(false);
   };
 
-  const modeBuckets = useMemo(() => getBucketsConfig(budgetMode), [budgetMode]);
+  const modeBuckets = useMemo(() => {
+    const base = { ...getBucketsConfig(budgetMode) }; // Clone to avoid mutating original
+    if (fullDiagnosis.personalizedBudget) {
+      if (base['Necessidades']) base['Necessidades'].percentage = fullDiagnosis.personalizedBudget.necessidades / 100;
+      if (base['Desejos']) base['Desejos'].percentage = fullDiagnosis.personalizedBudget.desejos / 100;
+      if (base['Reserva/Dívidas']) base['Reserva/Dívidas'].percentage = (fullDiagnosis.personalizedBudget.dividas + fullDiagnosis.personalizedBudget.reserva) / 100;
+    }
+    return base;
+  }, [budgetMode, fullDiagnosis.personalizedBudget]);
 
   useEffect(() => {
     setQuote(getRandomVerse());
@@ -236,13 +244,22 @@ export function Dashboard({
     .reduce((sum, t) => {
       const act = t.account || 'banco';
       const toAct = t.toAccount;
+      
+      if (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') {
+        if (isReserva(act)) {
+          return sum - t.amount;
+        } else {
+          return sum + t.amount;
+        }
+      }
+
       if (t.type === 'transfer_between_accounts' && isReserva(act) && isReserva(toAct)) {
         return sum; // Net zero change to savings
       }
-      if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
+      if (t.type === 'transfer_to_savings' || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
         return sum + t.amount;
       }
-      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && isReserva(act) && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && isReserva(act))) {
+      if (t.type === 'transfer_from_savings' || (t.type === 'expense' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(act))) {
         return sum - t.amount;
       }
       return sum;
@@ -1750,23 +1767,7 @@ export function Dashboard({
         <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mb-1 font-medium">Total Guardado (Cofrinho Geral)</p>
         <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
           {formatCurrency(
-            Object.values(allData).reduce((sum, month) => {
-              return sum + month.transactions.reduce((mSum, t) => {
-                if (t.isPending) return mSum;
-                const act = t.account || 'banco';
-                const toAct = t.toAccount;
-                if (t.type === 'transfer_between_accounts' && isReserva(act) && isReserva(toAct)) {
-                  return mSum;
-                }
-                if (t.type === 'transfer_to_savings' || (t.type === 'expense' && t.bucket === 'Reserva/Dívidas') || (t.type === 'income' && isReserva(act)) || (t.type === 'transfer_between_accounts' && isReserva(toAct))) {
-                  return mSum + t.amount;
-                }
-                if (t.type === 'transfer_from_savings' || (t.type === 'expense' && isReserva(act) && t.bucket !== 'Reserva/Dívidas') || (t.type === 'transfer_between_accounts' && isReserva(act))) {
-                  return mSum - t.amount;
-                }
-                return mSum;
-              }, 0);
-            }, 0)
+            accounts.reduce((sum, acc) => (acc.id === 'reserva' || acc.type === 'reserva') ? sum + (accountBalances[acc.id] || 0) : sum, 0) + (accounts.find(a => a.id === 'reserva') ? 0 : (accountBalances['reserva'] || 0))
           )}
         </p>
       </div>
@@ -2022,6 +2023,35 @@ export function Dashboard({
 
   return (
     <div className="space-y-6 pb-24">
+      {/* Copiloto Financeiro - Prioridade do Dia */}
+      <div className={`p-5 rounded-3xl shadow-sm border ${
+        fullDiagnosis.dailyPriority.type === 'alert' 
+          ? 'bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800/30' 
+          : fullDiagnosis.dailyPriority.type === 'success' 
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/30'
+            : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800/30'
+      }`}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xl">
+            {fullDiagnosis.dailyPriority.type === 'alert' ? '🚨' : fullDiagnosis.dailyPriority.type === 'success' ? '🎉' : '🧠'}
+          </span>
+          <h2 className={`font-bold text-sm tracking-wide ${
+            fullDiagnosis.dailyPriority.type === 'alert' ? 'text-rose-700 dark:text-rose-400' 
+            : fullDiagnosis.dailyPriority.type === 'success' ? 'text-emerald-700 dark:text-emerald-400'
+            : 'text-indigo-700 dark:text-indigo-400'
+          }`}>
+            {fullDiagnosis.dailyPriority.title}
+          </h2>
+        </div>
+        <p className={`text-sm leading-relaxed ${
+          fullDiagnosis.dailyPriority.type === 'alert' ? 'text-rose-800 dark:text-rose-300' 
+            : fullDiagnosis.dailyPriority.type === 'success' ? 'text-emerald-800 dark:text-emerald-300'
+            : 'text-indigo-800 dark:text-indigo-300'
+        }`}>
+          {fullDiagnosis.dailyPriority.description}
+        </p>
+      </div>
+
       <header className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-900/90 p-6 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-slate-100/80 dark:border-slate-800 transition-colors">
         <div className="grid grid-cols-3 items-center gap-2 sm:gap-4 mb-4">
           {/* Saldo Inicial - Esquerda */}
