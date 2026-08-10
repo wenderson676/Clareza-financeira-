@@ -4,6 +4,7 @@ import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckC
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account, Transaction, Bucket } from '../types';
 import { DebtsSection } from './DebtsSection';
+import { CashFlowAnalyzer } from './CashFlowAnalyzer';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -2052,6 +2053,8 @@ export function Dashboard({
           </div>
         </div>
       </header>
+
+      <CashFlowAnalyzer data={data} currentBalance={currentBalance} budgetMode={budgetMode} accounts={accounts} />
 
       {/* Central de Notificações e Alertas do APK/Web */}
       {(alerts.length > 0 || permissionStatus === 'default') && (
