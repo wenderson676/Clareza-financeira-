@@ -3,7 +3,6 @@ import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus,
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Comparison } from './components/Comparison';
-import { Planning } from './components/Planning';
 import { TransactionModal } from './components/TransactionModal';
 import { ActionMenuModal } from './components/ActionMenuModal';
 import { GoalModal } from './components/GoalModal';
@@ -16,7 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetMode, Goal } from './types';
 import { BUDGET_MODES_INFO } from './lib/utils';
 
-type Tab = 'dashboard' | 'transactions' | 'planning' | 'comparison';
+type Tab = 'dashboard' | 'transactions' | 'comparison';
 
 export default function App() {
   const { 
@@ -767,19 +766,6 @@ export default function App() {
               onSaveNote={(note) => setDevotionalNote(monthId, note)}
             />
           )}
-          {currentTab === 'planning' && (
-            <Planning 
-              data={monthData} 
-              allData={state.monthlyData}
-              previousBalance={getAccumulatedBalance(monthId)} 
-              budgetMode={state.budgetMode || '50-30-20'}
-              debts={state.debts || []}
-              goals={state.goals}
-              accounts={state.accounts || []}
-              onSaveNote={(note) => setDevotionalNote(monthId, note)}
-              onSetBudgetMode={setBudgetMode}
-            />
-          )}
           {currentTab === 'comparison' && (
             <Comparison allData={state.monthlyData} />
           )}
@@ -1269,13 +1255,6 @@ export default function App() {
             </button>
           </div>
 
-          <NavItem 
-            id="nav-planning"
-            icon={<Target size={24} />} 
-            label="Contador" 
-            isActive={currentTab === 'planning'} 
-            onClick={() => setCurrentTab('planning')} 
-          />
           <NavItem 
             id="nav-comparison"
             icon={<BarChart2 size={24} />}

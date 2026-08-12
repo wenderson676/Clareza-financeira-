@@ -71,13 +71,6 @@ export function TutorialTour({
       tab: 'transactions',
     },
     {
-      title: '🎯 O Copiloto Financeiro',
-      description: 'A aba Contador evoluiu! Ela agora lê suas metas, dívidas e anotações do diário para gerar um diagnóstico completo da sua Fase Financeira e do seu Risco atual.',
-      targetId: 'planning-diagnosis',
-      placement: 'bottom',
-      tab: 'planning',
-    },
-    {
       title: '📊 Gráficos e Comparativos',
       description: 'Na aba Análise, visualize gráficos interativos, divisões de porcentagem por categorias e compare a evolução do seu patrimônio mês a mês.',
       targetId: 'nav-comparison',

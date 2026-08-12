@@ -330,7 +330,7 @@ export function TransactionModal({
               <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <button
                   type="button"
-                  onClick={() => { setFormTab(initialTab || 'expense'); setCategory(''); }}
+                  onClick={() => { setFormTab('expense'); setCategory(''); }}
                   className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
                     formTab === 'expense' 
                       ? 'bg-white dark:bg-slate-700 shadow-sm text-rose-600 dark:text-rose-400' 
