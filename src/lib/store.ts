@@ -169,18 +169,22 @@ export function useStore() {
     return balance;
   };
 
-  const addTransaction = (monthId: string, transaction: Omit<Transaction, 'id'>) => {
+  const addTransaction = (passedMonthId: string, transaction: Omit<Transaction, 'id'>) => {
     const newTransaction: Transaction = {
       ...transaction,
       id: crypto.randomUUID()
     };
+    
+    // Derive the correct monthId from the transaction date to ensure it lands in the right month
+    const targetMonthId = transaction.date.substring(0, 7); // e.g. "2024-05"
+
     setState(prev => {
-      const month = prev.monthlyData[monthId] || { monthId, transactions: [] };
+      const month = prev.monthlyData[targetMonthId] || { monthId: targetMonthId, transactions: [] };
       return {
         ...prev,
         monthlyData: {
           ...prev.monthlyData,
-          [monthId]: {
+          [targetMonthId]: {
             ...month,
             transactions: [...month.transactions, newTransaction]
           }

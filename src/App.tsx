@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle, Copyright, Sparkles, Heart, Copy, Check } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
@@ -273,6 +273,44 @@ export default function App() {
   }, [isDarkMode]);
 
   const monthData = getMonthlyData(monthId);
+
+  const currentBalance = useMemo(() => {
+    const isReserva = (id?: string) => id === 'reserva' || state.accounts?.find(a => a.id === id)?.type === 'reserva';
+    let balance = (state.accounts || []).reduce((sum, acc) => {
+      if (acc.id !== 'reserva' && acc.type !== 'reserva') {
+        return sum + (acc.initialBalance || 0);
+      }
+      return sum;
+    }, 0);
+
+    const sortedMonthIds = Object.keys(state.monthlyData).sort();
+    for (const mId of sortedMonthIds) {
+      const month = state.monthlyData[mId];
+      if (!month || !month.transactions) continue;
+
+      for (const t of month.transactions) {
+        if (t.isPending) continue;
+
+        const amt = t.amount;
+        const act = t.account || 'banco';
+        const toAct = t.toAccount;
+
+        if (t.type === 'income' && !isReserva(act)) {
+          balance += amt;
+        } else if (t.type === 'expense' && !isReserva(act)) {
+          balance -= amt;
+        } else if (t.type === 'transfer_to_savings' && !isReserva(act)) {
+          balance -= amt;
+        } else if (t.type === 'transfer_from_savings' && !isReserva(act)) {
+          balance += amt;
+        } else if (t.type === 'transfer_between_accounts') {
+          if (!isReserva(act)) balance -= amt;
+          if (toAct && !isReserva(toAct)) balance += amt;
+        }
+      }
+    }
+    return balance;
+  }, [state.monthlyData, state.accounts]);
 
   const formattedMonth = format(currentMonthDate, 'MMMM yyyy', { locale: ptBR });
   const capitalizedMonth = formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1);
@@ -767,7 +805,15 @@ export default function App() {
             />
           )}
           {currentTab === 'comparison' && (
-            <Comparison allData={state.monthlyData} />
+            <Comparison 
+              data={monthData}
+              allData={state.monthlyData} 
+              currentBalance={currentBalance}
+              budgetMode={state.budgetMode || '50-30-20'}
+              accounts={state.accounts || []}
+              debts={state.debts || []}
+              onSetBudgetMode={setBudgetMode}
+            />
           )}
         </main>
 

@@ -4,7 +4,6 @@ import { HelpCircle, X, Calendar, ArrowRight, Target, Plus, Trash, Edit2, CheckC
 import { formatCurrency, getBucketsConfig, BUCKET_EXPLANATIONS, getRandomVerse } from '../lib/utils';
 import { MonthlyData, Goal, BudgetMode, Debt, AccountType, Account, Transaction, Bucket } from '../types';
 import { DebtsSection } from './DebtsSection';
-import { CashFlowAnalyzer } from './CashFlowAnalyzer';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -257,21 +256,27 @@ export function Dashboard({
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
+  const monthProjectedDifference = projectedIncome - projectedExpenses;
+
   const projectedBalance = useMemo(() => {
-    let balance = currentBalance;
+    let balance = accounts.reduce((sum, acc) => {
+      if (acc.id !== 'reserva' && acc.type !== 'reserva') {
+        return sum + (acc.initialBalance || 0);
+      }
+      return sum;
+    }, 0);
+
     const sortedMonthIds = Object.keys(allData).sort();
     for (const mId of sortedMonthIds) {
       if (mId > data.monthId) continue;
       const month = allData[mId];
       if (!month || !month.transactions) continue;
-      
+
       for (const t of month.transactions) {
-        if (!t.isPending) continue;
-        
         const amt = t.amount;
         const act = t.account || 'banco';
         const toAct = t.toAccount;
-        
+
         if (t.type === 'income' && !isReserva(act)) {
           balance += amt;
         } else if (t.type === 'expense' && !isReserva(act)) {
@@ -287,7 +292,7 @@ export function Dashboard({
       }
     }
     return balance;
-  }, [allData, data.monthId, currentBalance, accounts]);
+  }, [allData, data.monthId, accounts]);
 
 
   const getBucketSpent = (bucket: string) => {
@@ -341,14 +346,14 @@ export function Dashboard({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const DEFAULT_CARD_ORDER = [
+    'analiseMensal',
     'contas',
     'contasAPagar',
     'envelopes',
-    'analiseMensal',
     'distribuicao',
+    'evolucao',
     'cofrinho',
     'dividas',
-    'evolucao',
     'reflexao',
     'sabedoria'
   ];
@@ -509,9 +514,9 @@ export function Dashboard({
           <div className="font-bold text-rose-600 dark:text-rose-400 text-sm sm:text-base">{formatCurrency(projectedExpenses)}</div>
         </div>
         <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100/50 dark:border-slate-700/50 text-center">
-          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Previsão de Saldo</div>
-          <div className={`font-bold text-sm sm:text-base ${projectedBalance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-            {projectedBalance >= 0 ? '+' : ''}{formatCurrency(projectedBalance)}
+          <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide mb-1">Resultado do Mês</div>
+          <div className={`font-bold text-sm sm:text-base ${monthProjectedDifference >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+            {monthProjectedDifference >= 0 ? '+' : ''}{formatCurrency(monthProjectedDifference)}
           </div>
         </div>
       </div>
@@ -1076,8 +1081,6 @@ export function Dashboard({
           </div>
         </div>
       </header>
-
-      <CashFlowAnalyzer data={data} currentBalance={currentBalance} budgetMode={budgetMode} accounts={accounts} />
 
       {/* Central de Notificações e Alertas do APK/Web */}
       {(alerts.length > 0 || permissionStatus === 'default') && (

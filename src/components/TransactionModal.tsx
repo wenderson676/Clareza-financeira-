@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { X } from 'lucide-react';
+import { format, addDays, addWeeks, addMonths, parseISO } from 'date-fns';
+import { X, RefreshCw } from 'lucide-react';
 import { Transaction, TransactionType, Bucket, AccountType, Account } from '../types';
 import { formatCurrency, CATEGORIES, BUCKETS } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,6 +43,8 @@ export function TransactionModal({
   const [isPending, setIsPending] = useState(false);
   const [account, setAccount] = useState<AccountType>('banco');
   const [error, setError] = useState('');
+  const [recurrenceFreq, setRecurrenceFreq] = useState<'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly'>('none');
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(2);
 
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -259,17 +261,41 @@ export function TransactionModal({
       }
     }
 
-    onSave({
+    const baseTransaction = {
       type: finalType,
       amount: parsedAmount,
       description: finalDescription,
-      date,
       bucket: finalBucket,
       category: finalCategory,
       isPending,
       account: finalAccount,
       toAccount: finalToAccount
-    });
+    };
+
+    if (recurrenceFreq === 'none' || editingTransaction) {
+      onSave({
+        ...baseTransaction,
+        date
+      });
+    } else {
+      let currentDate = parseISO(date);
+      for (let i = 0; i < recurrenceCount; i++) {
+        onSave({
+          ...baseTransaction,
+          date: format(currentDate, 'yyyy-MM-dd')
+        });
+        
+        if (recurrenceFreq === 'daily') {
+          currentDate = addDays(currentDate, 1);
+        } else if (recurrenceFreq === 'weekly') {
+          currentDate = addWeeks(currentDate, 1);
+        } else if (recurrenceFreq === 'biweekly') {
+          currentDate = addWeeks(currentDate, 2);
+        } else if (recurrenceFreq === 'monthly') {
+          currentDate = addMonths(currentDate, 1);
+        }
+      }
+    }
 
     if (shouldClose) {
       onClose();
@@ -277,6 +303,8 @@ export function TransactionModal({
       setAmount('');
       setDescription('');
       setCategory('');
+      setRecurrenceFreq('none');
+      setRecurrenceCount(2);
     }
   };
 
@@ -597,8 +625,47 @@ export function TransactionModal({
                 </div>
               )}
 
+              {/* Recurrence Selection (only if not editing) */}
+              {!editingTransaction && (
+                <div className="flex flex-col gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 mt-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                      <RefreshCw size={12} />
+                      Repetir
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={recurrenceFreq}
+                      onChange={e => setRecurrenceFreq(e.target.value as any)}
+                      className="flex-1 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-1.5 px-2 outline-none focus:border-slate-400 text-xs font-medium"
+                    >
+                      <option value="none">Não repetir</option>
+                      <option value="daily">Diário</option>
+                      <option value="weekly">Semanal</option>
+                      <option value="biweekly">Quinzenal</option>
+                      <option value="monthly">Mensal</option>
+                    </select>
+                    
+                    {recurrenceFreq !== 'none' && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-500">vezes:</span>
+                        <input
+                          type="number"
+                          min="2"
+                          max="120"
+                          value={recurrenceCount}
+                          onChange={e => setRecurrenceCount(parseInt(e.target.value) || 2)}
+                          className="w-14 bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg py-1.5 px-2 outline-none focus:border-slate-400 text-xs text-center font-medium"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Pending Switcher */}
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 mt-1 border-t border-slate-100 dark:border-slate-800">
                 <input 
                   type="checkbox" 
                   id="isPending"
