@@ -1,6 +1,6 @@
 export type AIState = 'AI_UNLOADED' | 'AI_LOADING' | 'AI_READY' | 'AI_PROCESSING' | 'AI_IDLE' | 'AI_UNLOADING' | 'AI_ERROR';
 
-export type AIModelType = 'LFM2.5-350M' | 'Gemma-3-1B';
+export type AIModelType = 'Assistente-Rápido' | 'Conselheiro-Avançado';
 
 export interface AIModelStatus {
   name: AIModelType;

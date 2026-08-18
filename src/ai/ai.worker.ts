@@ -11,13 +11,13 @@ let currentModelLoaded: string | null = null;
 
 // Convertendo para modelos menores compatíveis com a Transformers.js via ONNX
 const MODEL_MAPPING = {
-  'LFM2.5-350M': 'Xenova/Qwen1.5-0.5B-Chat',
-  'Gemma-3-1B': 'Xenova/TinyLlama-1.1B-Chat-v1.0' // TinyLlama é leve o suficiente para rodar na CPU
+  'Assistente-Rápido': 'Xenova/Qwen1.5-0.5B-Chat',
+  'Conselheiro-Avançado': 'Xenova/TinyLlama-1.1B-Chat-v1.0' // TinyLlama é leve o suficiente para rodar na CPU
 };
 
 let installedModels: Record<AIModelType, boolean> = {
-  'LFM2.5-350M': false,
-  'Gemma-3-1B': false
+  'Assistente-Rápido': false,
+  'Conselheiro-Avançado': false
 };
 
 const setState = (newState: AIState) => {
@@ -85,7 +85,7 @@ const processQuery = async (query: string, context: any) => {
   let responseText = '';
 
   try {
-    const modelToUse = isComplex ? 'Gemma-3-1B' : 'LFM2.5-350M';
+    const modelToUse = isComplex ? 'Conselheiro-Avançado' : 'Assistente-Rápido';
     const systemPrompt = isComplex ? ADVANCED_SYSTEM_PROMPT : FAST_SYSTEM_PROMPT;
 
     if (!installedModels[modelToUse]) {

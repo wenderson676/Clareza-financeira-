@@ -8,8 +8,8 @@ let globalAiState: AIState = 'AI_UNLOADED';
 let globalMessages: AIMessage[] = [];
 let globalStatusText = '';
 let globalInstalledModels: Record<AIModelType, boolean> = {
-  'LFM2.5-350M': false,
-  'Gemma-3-1B': false
+  'Assistente-Rápido': false,
+  'Conselheiro-Avançado': false
 };
 
 const listeners = new Set<() => void>();
