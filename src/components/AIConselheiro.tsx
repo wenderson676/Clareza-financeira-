@@ -59,21 +59,59 @@ export const AIConselheiro = () => {
       
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 z-0 pb-24">
-        {messages.length === 0 && (
+        {!hasAnyModelInstalled ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center h-full text-center max-w-sm mx-auto mt-10"
+          >
+            <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-6 shadow-sm border border-indigo-200 dark:border-indigo-800">
+              <Cpu size={40} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-3">
+              IA Offline Embutida
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-8">
+              O motor de inteligência artificial já está incluso neste aplicativo. Clique abaixo para ativá-lo na memória RAM do seu dispositivo e começar a usar.
+            </p>
+
+            {aiState === 'AI_LOADING' ? (
+              <div className="w-full bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                    {statusText || "Iniciando ativação..."}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                  <div className="bg-indigo-500 h-full rounded-full animate-pulse" style={{ width: '100%' }}></div>
+                </div>
+              </div>
+            ) : (
+              <button 
+                onClick={() => installModel('Assistente-Rápido')}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 transform active:scale-95"
+              >
+                <Cpu size={20} />
+                Ativar Inteligência Artificial
+              </button>
+            )}
+          </motion.div>
+        ) : messages.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400 max-w-xs mx-auto"
+            className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-10"
           >
-            <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-4">
-              <Bot size={32} className="text-indigo-600 dark:text-indigo-400" />
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mb-4 border border-emerald-200 dark:border-emerald-800/50 shadow-sm">
+              <CheckCircle size={32} className="text-emerald-600 dark:text-emerald-400" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">Como posso ajudar?</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">IA Ativada!</h3>
             <p className="text-sm leading-relaxed">
-              Diga coisas como <span className="font-medium text-indigo-600 dark:text-indigo-400">"Gastei R$50 de gasolina"</span> ou <span className="font-medium text-indigo-600 dark:text-indigo-400">"Me dê dicas para economizar"</span>.
+              O assistente está rodando na sua memória. Diga coisas como <span className="font-medium text-indigo-600 dark:text-indigo-400">"Gastei R$50 de gasolina"</span>.
             </p>
           </motion.div>
-        )}
+        ) : null}
 
         {messages.map((msg, index) => {
           const isUser = msg.role === 'user';
@@ -213,7 +251,7 @@ export const AIConselheiro = () => {
                         onClick={() => installModel('Assistente-Rápido')} 
                         className="flex items-center gap-1.5 text-white text-xs font-bold bg-indigo-600 hover:bg-indigo-700 px-3.5 py-1.5 rounded-full disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        <Download size={14} /> Baixar
+                        <Cpu size={14} /> Ativar
                       </button>
                     )}
                   </div>
@@ -240,7 +278,7 @@ export const AIConselheiro = () => {
                         onClick={() => installModel('Conselheiro-Avançado')} 
                         className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 text-xs font-bold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 px-3.5 py-1.5 rounded-full disabled:opacity-50 transition-colors shadow-sm"
                       >
-                        <Download size={14} /> Baixar
+                        <Cpu size={14} /> Ativar
                       </button>
                     )}
                   </div>
@@ -253,7 +291,7 @@ export const AIConselheiro = () => {
                 {statusText && aiState === 'AI_LOADING' && (
                   <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 p-4 rounded-xl mt-4 text-center">
                     <p className="text-xs text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center gap-2 animate-pulse">
-                      <Download size={16} /> {statusText}
+                      <Cpu size={16} /> {statusText}
                     </p>
                   </div>
                 )}
@@ -261,7 +299,7 @@ export const AIConselheiro = () => {
                 {aiState === 'AI_ERROR' && messages.filter(m => m.role === 'system').length > 0 && (
                   <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/50 p-4 rounded-xl mt-4">
                     <p className="text-xs font-bold text-rose-700 dark:text-rose-400 mb-1 flex items-center gap-1.5">
-                      <AlertCircle size={14} /> Falha no Download
+                      <AlertCircle size={14} /> Falha na Ativação
                     </p>
                     <p className="text-[11px] text-rose-600/80 dark:text-rose-300/80 break-words leading-relaxed">
                       {messages.filter(m => m.role === 'system').pop()?.content}

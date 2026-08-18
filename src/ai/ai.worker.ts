@@ -20,6 +20,57 @@ let installedModels: Record<AIModelType, boolean> = {
   'Conselheiro-Avançado': false
 };
 
+// Restore installed models state from IndexedDB/Cache (Transformers.js automatically caches the files)
+// We use a simple message from the main thread to sync this, or we can just rely on Transformers.js cache check.
+// But checking cache directly is complex, so we will store the 'installed' flag in IndexedDB.
+
+const DB_NAME = 'AIOfflineStore';
+const STORE_NAME = 'modelsState';
+
+async function initDB() {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e: any) => {
+      e.target.result.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveModelState(modelType: AIModelType, isInstalled: boolean) {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(isInstalled, modelType);
+  } catch (e) {
+    console.error('Falha ao salvar estado do modelo:', e);
+  }
+}
+
+async function loadModelsState() {
+  try {
+    const db = await initDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    
+    const req1 = store.get('Assistente-Rápido');
+    const req2 = store.get('Conselheiro-Avançado');
+    
+    req1.onsuccess = () => { if (req1.result) installedModels['Assistente-Rápido'] = true; };
+    req2.onsuccess = () => { if (req2.result) installedModels['Conselheiro-Avançado'] = true; };
+    
+    tx.oncomplete = () => {
+      self.postMessage({ type: 'STATUS_UPDATE', payload: { installedModels } });
+    };
+  } catch (e) {
+    console.error('Falha ao carregar estado dos modelos:', e);
+  }
+}
+
+// Inicializa lendo do banco local
+loadModelsState();
+
 const setState = (newState: AIState) => {
   state = newState;
   self.postMessage({ type: 'STATE_CHANGE', payload: { state } });
@@ -35,11 +86,11 @@ async function loadModel(modelType: AIModelType) {
   try {
     const cb = (progress: any) => {
       if (progress.status === 'downloading' || progress.status === 'progress') {
-        let msg = progress.status === 'downloading' ? 'Baixando' : 'Carregando';
+        let msg = progress.status === 'downloading' ? 'Ativando pacote' : 'Carregando na RAM';
         let percent = progress.progress ? Math.round(progress.progress) : 0;
-        self.postMessage({ type: 'STATUS_UPDATE', payload: `${msg}: ${percent}% (${progress.file || ''})` });
+        self.postMessage({ type: 'STATUS_UPDATE', payload: `${msg}: ${percent}%` });
       } else if (progress.status === 'ready') {
-        self.postMessage({ type: 'STATUS_UPDATE', payload: `Modelo ${modelType} pronto na CPU!` });
+        self.postMessage({ type: 'STATUS_UPDATE', payload: `Modelo ${modelType} ativado com sucesso!` });
       }
     };
 
@@ -52,6 +103,7 @@ async function loadModel(modelType: AIModelType) {
     
     currentModelLoaded = actualModelId;
     installedModels[modelType] = true;
+    saveModelState(modelType, true); // Salva que o pacote foi baixado para a próxima sessão
     self.postMessage({ type: 'STATUS_UPDATE', payload: { installedModels } });
     setState('AI_READY');
   } catch (err: any) {
