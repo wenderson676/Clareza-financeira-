@@ -60,7 +60,16 @@ async function loadModel(modelType: AIModelType) {
     setState('AI_READY');
   } catch (err: any) {
     const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-    throw new Error(`Falha ao iniciar WebGPU ou carregar modelo: ${errorMsg}. Tente abrir o app em uma nova aba.`);
+    
+    if (errorMsg.includes("Unable to find a compatible GPU") || errorMsg.includes("requestAdapter")) {
+      throw new Error(
+        "Seu navegador bloqueou o acesso à placa de vídeo (WebGPU), o que é comum em PWAs no celular. " +
+        "Para ativar a IA offline no Android: 1. Copie e cole 'chrome://flags/#enable-unsafe-webgpu' no Chrome. " +
+        "2. Mude para 'Enabled'. 3. Reinicie o Chrome. (No iOS, o WebGPU ainda está em fase experimental)."
+      );
+    }
+    
+    throw new Error(`Falha ao iniciar WebGPU: ${errorMsg}`);
   }
 }
 
