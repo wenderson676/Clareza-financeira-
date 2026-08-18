@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAIManager } from '../ai/useAIManager';
 import { useStore } from '../lib/store';
-import { Send, Bot, BrainCircuit, Download, CheckCircle, Trash2, ShieldCheck, X } from 'lucide-react';
+import { Send, Bot, BrainCircuit, Download, CheckCircle, Trash2, ShieldCheck, X, AlertTriangle, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AIConselheiroProps {
@@ -13,7 +13,25 @@ export function AIConselheiro({ onClose }: AIConselheiroProps) {
   const { aiState, messages, sendMessage, statusText, installedModels, installModel } = useAIManager(store.addTransaction);
   const [input, setInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [gpuSupported, setGpuSupported] = useState<boolean | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkGpu = async () => {
+      if (!('gpu' in navigator)) {
+        setGpuSupported(false);
+        return;
+      }
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        setGpuSupported(!!adapter);
+      } catch (e) {
+        setGpuSupported(false);
+      }
+    };
+    checkGpu();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,6 +42,51 @@ export function AIConselheiro({ onClose }: AIConselheiroProps) {
     if (!input.trim()) return;
     sendMessage(input.trim(), (store.state.debts?.length || 0) > 0);
     setInput('');
+  };
+
+  const handleCopyFlag = () => {
+    navigator.clipboard.writeText('chrome://flags/#enable-unsafe-webgpu');
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 3000);
+  };
+
+  const WarningBanner = () => {
+    if (gpuSupported !== false) return null;
+    
+    return (
+      <div className="mx-4 mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-200 dark:border-amber-800">
+         <div className="flex items-start gap-3">
+            <AlertTriangle className="text-amber-600 mt-1 flex-shrink-0" size={20} />
+            <div>
+               <h3 className="font-bold text-amber-900 dark:text-amber-300 text-sm">Ação Necessária (Android)</h3>
+               <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">
+                 O navegador bloqueou o acesso à placa de vídeo deste app. Para a IA Offline funcionar, você precisa ativar uma configuração no Chrome.
+               </p>
+               
+               <div className="mt-3 space-y-2">
+                 <p className="text-xs text-amber-900/80 dark:text-amber-400/80 font-medium">1. Copie o link abaixo:</p>
+                 <div className="flex items-center gap-2">
+                    <code className="text-[10px] bg-white dark:bg-slate-900 px-2 py-1.5 rounded text-slate-700 dark:text-slate-300 border border-amber-100 dark:border-amber-900/50 flex-1 truncate">
+                      chrome://flags/#enable-unsafe-webgpu
+                    </code>
+                    <button 
+                      onClick={handleCopyFlag}
+                      className="bg-amber-600 hover:bg-amber-700 text-white p-1.5 rounded-lg flex items-center justify-center transition-colors"
+                      title="Copiar link"
+                    >
+                      {copiedLink ? <CheckCircle size={14} /> : <Copy size={14} />}
+                    </button>
+                 </div>
+                 <p className="text-xs text-amber-900/80 dark:text-amber-400/80 mt-2 font-medium">
+                   2. Cole na barra de endereços do Chrome.<br/>
+                   3. Mude a opção destacada em amarelo para <strong>"Enabled"</strong>.<br/>
+                   4. Clique no botão azul <strong>"Relaunch"</strong> para reiniciar.
+                 </p>
+               </div>
+            </div>
+         </div>
+      </div>
+    );
   };
 
   if (showSettings) {
@@ -98,6 +161,8 @@ export function AIConselheiro({ onClose }: AIConselheiroProps) {
           Modelos
         </button>
       </div>
+
+      <WarningBanner />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
