@@ -11,6 +11,9 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        workbox: {
+          maximumFileSizeToCacheInBytes: 10 * 1024 * 1024 // 10MB to accommodate the web-llm worker
+        },
         manifest: {
           name: 'Clareza',
           short_name: 'Clareza',
