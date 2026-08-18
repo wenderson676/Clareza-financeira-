@@ -53,7 +53,12 @@ async function loadModel(modelType: AIModelType) {
   const eng = await getEngine();
   
   try {
-    await eng.reload(actualModelId);
+    // Some mobile devices require specific WebGPU config via appConfig
+    await eng.reload(actualModelId, {
+      chatOpts: {
+        repetition_penalty: 1.0,
+      }
+    });
     currentModelLoaded = actualModelId;
     installedModels[modelType] = true; // Mark as installed once successfully loaded
     self.postMessage({ type: 'STATUS_UPDATE', payload: { installedModels } });
