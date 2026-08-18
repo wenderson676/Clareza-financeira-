@@ -204,10 +204,11 @@ self.onmessage = async (e: MessageEvent<AIWorkerMessage>) => {
       case 'UNLOAD':
         setState('AI_UNLOADING');
         if (engine) {
-           await engine.unload(); // Unload from GPU memory
-           engine = null;
+           const tempEngine = engine;
+           engine = null; // Set null immediately to avoid getEngine() returning it
+           currentModelLoaded = null;
+           await tempEngine.unload(); // Unload from GPU memory
         }
-        currentModelLoaded = null;
         setState('AI_UNLOADED');
         break;
     }

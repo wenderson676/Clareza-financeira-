@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAIManager } from '../ai/useAIManager';
+import { useStore } from '../lib/store';
 import { Send, Bot, BrainCircuit, Download, CheckCircle, Trash2, ShieldCheck, X } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -8,7 +9,8 @@ interface AIConselheiroProps {
 }
 
 export function AIConselheiro({ onClose }: AIConselheiroProps) {
-  const { aiState, messages, sendMessage, unloadModels, statusText, installedModels, installModel } = useAIManager();
+  const store = useStore();
+  const { aiState, messages, sendMessage, statusText, installedModels, installModel } = useAIManager(store.addTransaction);
   const [input, setInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -17,17 +19,10 @@ export function AIConselheiro({ onClose }: AIConselheiroProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, statusText]);
 
-  // Unload when closing chat
-  useEffect(() => {
-    return () => {
-      unloadModels();
-    };
-  }, [unloadModels]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    sendMessage(input.trim());
+    sendMessage(input.trim(), (store.state.debts?.length || 0) > 0);
     setInput('');
   };
 
