@@ -40,6 +40,10 @@ async function getEngine() {
 }
 
 async function loadModel(modelType: AIModelType) {
+  if (!navigator.gpu) {
+    throw new Error("WebGPU não suportado neste navegador. Se estiver em uma pré-visualização, tente abrir o app em uma NOVA ABA, ou utilize o Google Chrome no desktop.");
+  }
+
   const actualModelId = MODEL_MAPPING[modelType];
   if (currentModelLoaded === actualModelId && engine) return;
   
@@ -55,7 +59,8 @@ async function loadModel(modelType: AIModelType) {
     self.postMessage({ type: 'STATUS_UPDATE', payload: { installedModels } });
     setState('AI_READY');
   } catch (err: any) {
-    throw new Error(`Falha ao iniciar WebGPU ou carregar modelo: ${err.message}. Verifique se seu navegador suporta WebGPU.`);
+    const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+    throw new Error(`Falha ao iniciar WebGPU ou carregar modelo: ${errorMsg}. Tente abrir o app em uma nova aba.`);
   }
 }
 
