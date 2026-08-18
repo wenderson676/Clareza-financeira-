@@ -91,6 +91,11 @@ async function loadModel(modelType: AIModelType) {
         self.postMessage({ type: 'STATUS_UPDATE', payload: `${msg}: ${percent}%` });
       } else if (progress.status === 'ready') {
         self.postMessage({ type: 'STATUS_UPDATE', payload: `Modelo ${modelType} ativado com sucesso!` });
+      } else if (progress.status === 'done') {
+        saveModelState(modelType, true); // Salva no banco de dados assim que termina de baixar
+        installedModels[modelType] = true;
+        self.postMessage({ type: 'STATUS_UPDATE', payload: `Processamento concluído. Iniciando...` });
+        self.postMessage({ type: 'STATUS_UPDATE', payload: { installedModels } });
       }
     };
 

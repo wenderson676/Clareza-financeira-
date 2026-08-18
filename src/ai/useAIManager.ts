@@ -79,6 +79,8 @@ export function useAIManager(storeAddTransaction?: (monthId: string, transaction
               content: `Erro: ${payload}`,
               timestamp: Date.now()
             }];
+            globalAiState = 'AI_ERROR'; // Fix stuck states
+            globalStatusText = '';
             notifyListeners();
             break;
         }
@@ -128,6 +130,10 @@ export function useAIManager(storeAddTransaction?: (monthId: string, transaction
 
   const installModel = useCallback((model: AIModelType) => {
      if (!globalWorker) initWorker();
+     globalAiState = 'AI_LOADING';
+     globalStatusText = 'Iniciando ativação...';
+     setAiState(globalAiState);
+     setStatusText(globalStatusText);
      globalWorker?.postMessage({ type: 'INSTALL', payload: { model } });
   }, [initWorker]);
 
