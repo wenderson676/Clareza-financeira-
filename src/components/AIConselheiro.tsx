@@ -107,37 +107,62 @@ export function AIConselheiro({ onClose }: AIConselheiroProps) {
              </p>
            </div>
 
-           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between opacity-100 transition-opacity">
               <div>
-                <h3 className="font-bold text-sm">LFM2.5-350M</h3>
+                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">LFM2.5-350M</h3>
                 <p className="text-xs text-slate-500">IA Rápida (Recomendado)</p>
               </div>
               {installedModels['LFM2.5-350M'] ? (
-                 <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-100 px-2 py-1 rounded">
+                 <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded">
                    <CheckCircle size={14} /> Instalado
                  </span>
               ) : (
-                 <button onClick={() => installModel('LFM2.5-350M')} className="flex items-center gap-1 text-indigo-600 text-xs font-bold bg-indigo-100 px-3 py-1.5 rounded-lg">
-                   <Download size={14} /> Instalar
+                 <button 
+                    disabled={aiState === 'AI_LOADING' || aiState === 'AI_PROCESSING'}
+                    onClick={() => installModel('LFM2.5-350M')} 
+                    className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                 >
+                   <Download size={14} /> Baixar
                  </button>
               )}
            </div>
 
            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-sm">Gemma 3 1B</h3>
-                <p className="text-xs text-slate-500">IA Avançada (Análises complexas)</p>
+                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">Gemma 3 1B</h3>
+                <p className="text-xs text-slate-500">IA Avançada (Análises)</p>
               </div>
               {installedModels['Gemma-3-1B'] ? (
-                 <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-100 px-2 py-1 rounded">
+                 <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded">
                    <CheckCircle size={14} /> Instalado
                  </span>
               ) : (
-                 <button onClick={() => installModel('Gemma-3-1B')} className="flex items-center gap-1 text-indigo-600 text-xs font-bold bg-indigo-100 px-3 py-1.5 rounded-lg">
-                   <Download size={14} /> Instalar
+                 <button 
+                    disabled={aiState === 'AI_LOADING' || aiState === 'AI_PROCESSING'}
+                    onClick={() => installModel('Gemma-3-1B')} 
+                    className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 text-xs font-bold bg-indigo-100 dark:bg-indigo-900/40 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                 >
+                   <Download size={14} /> Baixar
                  </button>
               )}
            </div>
+
+           {statusText && (
+             <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 p-4 rounded-2xl mt-4">
+               <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium flex items-center gap-2 animate-pulse">
+                 <Bot size={16} /> {statusText}
+               </p>
+             </div>
+           )}
+
+           {aiState === 'AI_ERROR' && messages.filter(m => m.role === 'system').length > 0 && (
+              <div className="bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 p-4 rounded-2xl mt-2">
+                 <p className="text-xs font-bold text-rose-700 dark:text-rose-400 mb-1">Erro de Instalação</p>
+                 <p className="text-[10px] text-rose-600 dark:text-rose-300 break-words">
+                   {messages.filter(m => m.role === 'system').pop()?.content}
+                 </p>
+              </div>
+           )}
         </div>
       </div>
     );

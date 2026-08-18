@@ -195,7 +195,9 @@ self.onmessage = async (e: MessageEvent<AIWorkerMessage>) => {
         try {
            await loadModel(modelToInstall);
         } catch (installErr: any) {
+           setState('AI_ERROR');
            self.postMessage({ type: 'ERROR', payload: installErr.message });
+           setState('AI_IDLE');
         }
         break;
 
