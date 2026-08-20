@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { AIConselheiro } from './components/AIConselheiro';
-import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle, Copyright, Sparkles, Heart, Copy, Check, Bot } from 'lucide-react';
+import { Home, ListOrdered, Lightbulb, Moon, Sun, Target, Menu, X, Trash2, Plus, ChevronLeft, ChevronRight, Download, Upload, BarChart2, MessageSquare, Smartphone, HelpCircle, Copyright, Sparkles, Heart, Copy, Check } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { Transactions } from './components/Transactions';
 import { Comparison } from './components/Comparison';
@@ -16,7 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Transaction, BudgetMode, Goal } from './types';
 import { BUDGET_MODES_INFO } from './lib/utils';
 
-type Tab = 'dashboard' | 'transactions' | 'comparison' | 'ai';
+type Tab = 'dashboard' | 'transactions' | 'comparison';
 
 export default function App() {
   const { 
@@ -816,9 +815,6 @@ export default function App() {
               onSetBudgetMode={setBudgetMode}
             />
           )}
-          {currentTab === 'ai' && (
-            <AIConselheiro onClose={() => setCurrentTab('dashboard')} />
-          )}
         </main>
 
         <TransactionModal
@@ -1278,17 +1274,17 @@ export default function App() {
 
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 w-full max-w-xl bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-4 py-4 flex justify-between items-center z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-safe transition-colors duration-300">
+        <nav className="fixed bottom-0 w-full max-w-xl bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center z-40 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.3)] pb-safe transition-colors duration-300">
           <NavItem 
             id="nav-home"
-            icon={<Home size={22} />} 
+            icon={<Home size={24} />} 
             label="Início" 
             isActive={currentTab === 'dashboard'} 
             onClick={() => setCurrentTab('dashboard')} 
           />
           <NavItem 
             id="nav-transactions"
-            icon={<ListOrdered size={22} />} 
+            icon={<ListOrdered size={24} />} 
             label="Extrato" 
             isActive={currentTab === 'transactions'} 
             onClick={() => setCurrentTab('transactions')} 
@@ -1299,25 +1295,18 @@ export default function App() {
             <button
               id="nav-add-btn"
               onClick={handleOpenActionMenu}
-              className="w-12 h-12 bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex items-center justify-center hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all"
+              className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-200 dark:shadow-emerald-900/20 flex items-center justify-center hover:bg-emerald-700 hover:scale-105 active:scale-95 transition-all"
             >
-              <Plus size={24} />
+              <Plus size={28} />
             </button>
           </div>
 
           <NavItem 
             id="nav-comparison"
-            icon={<BarChart2 size={22} />}
+            icon={<BarChart2 size={24} />}
             label="Análise"
             isActive={currentTab === 'comparison'}
             onClick={() => setCurrentTab('comparison')}
-          />
-          <NavItem 
-            id="nav-ai"
-            icon={<Bot size={22} />}
-            label="IA"
-            isActive={currentTab === 'ai'}
-            onClick={() => setCurrentTab('ai')}
           />
         </nav>
       </div>
@@ -1330,11 +1319,11 @@ function NavItem({ id, icon, label, isActive, onClick }: { id?: string, icon: Re
     <button 
       id={id}
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 min-w-[50px] transition-colors ${
+      className={`flex flex-col items-center gap-1 min-w-[70px] transition-colors ${
         isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300'
       }`}
     >
-      <div className={`p-1.5 rounded-xl transition-all ${isActive ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-transparent'}`}>
+      <div className={`p-2 rounded-xl transition-all ${isActive ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-transparent'}`}>
         {icon}
       </div>
       <span className="text-[10px] font-medium tracking-wide">{label}</span>

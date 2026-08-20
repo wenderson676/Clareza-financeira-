@@ -11,9 +11,6 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        workbox: {
-          maximumFileSizeToCacheInBytes: 50 * 1024 * 1024 // 50MB to accommodate the Transformers.js wasm files
-        },
         manifest: {
           name: 'Clareza',
           short_name: 'Clareza',
